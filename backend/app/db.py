@@ -1,14 +1,13 @@
 """
-Base de datos local (SQLite) para llevar el historial de intentos
-del estudiante por ejercicio, dentro de una sesión, y controlar el
-límite de consultas por tiempo (rate limiting).
+Base de datos local (SQLite).
 
-SQLite se eligió por ser la opción más simple posible para esta etapa
-del proyecto: no requiere instalar ni configurar un servidor de base
-de datos aparte, el archivo vive dentro del propio proyecto, y viene
-incluido en Python. Si más adelante el sistema crece (múltiples
-servidores, muchos usuarios concurrentes), se puede migrar a
-PostgreSQL sin rediseñar esta lógica.
+Tablas:
+- intentos: historial de consultas al tutor de IA (por sesión + ejercicio),
+  usado para la lógica pedagógica de intentos progresivos y rate limiting.
+- ejercicios: catálogo de ejercicios disponibles, organizados por tema,
+  lenguaje y nivel.
+
+SQLite se eligió por ser la opción más simple para esta etapa del proyecto.
 """
 
 import sqlite3
@@ -27,6 +26,7 @@ def get_connection():
 def init_db():
     """Crea las tablas si no existen. Se llama al iniciar el servidor."""
     conn = get_connection()
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS intentos (
@@ -39,12 +39,27 @@ def init_db():
         )
         """
     )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ejercicios (
+            id TEXT PRIMARY KEY,
+            tema TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            enunciado TEXT NOT NULL,
+            lenguaje TEXT NOT NULL,
+            nivel TEXT NOT NULL,
+            codigo_base TEXT NOT NULL,
+            orden INTEGER NOT NULL
+        )
+        """
+    )
+
     conn.commit()
     conn.close()
 
 
 def contar_intentos(sesion_id: str, ejercicio_id: str) -> int:
-    """Cuenta cuántas veces esta sesión ha preguntado sobre este ejercicio."""
     conn = get_connection()
     fila = conn.execute(
         "SELECT COUNT(*) AS total FROM intentos WHERE sesion_id = ? AND ejercicio_id = ?",
@@ -55,10 +70,6 @@ def contar_intentos(sesion_id: str, ejercicio_id: str) -> int:
 
 
 def contar_consultas_recientes(sesion_id: str, ventana_minutos: int) -> int:
-    """
-    Cuenta cuántas consultas ha hecho esta sesión (sobre cualquier ejercicio)
-    en los últimos X minutos — usado para el rate limiting.
-    """
     limite_tiempo = datetime.utcnow() - timedelta(minutes=ventana_minutos)
     conn = get_connection()
     fila = conn.execute(
@@ -80,5 +91,52 @@ def registrar_intento(
         """,
         (sesion_id, ejercicio_id, pregunta, int(pidio_respuesta_directa)),
     )
+    conn.commit()
+    conn.close()
+
+
+def listar_ejercicios(lenguaje: str = None, tema: str = None):
+    conn = get_connection()
+    query = "SELECT * FROM ejercicios WHERE 1=1"
+    params = []
+    if lenguaje:
+        query += " AND lenguaje = ?"
+        params.append(lenguaje)
+    if tema:
+        query += " AND tema = ?"
+        params.append(tema)
+    query += " ORDER BY orden ASC"
+    filas = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(fila) for fila in filas]
+
+
+def obtener_ejercicio(ejercicio_id: str):
+    conn = get_connection()
+    fila = conn.execute(
+        "SELECT * FROM ejercicios WHERE id = ?", (ejercicio_id,)
+    ).fetchone()
+    conn.close()
+    return dict(fila) if fila else None
+
+
+def cargar_catalogo_inicial(ejercicios: list):
+    """
+    Inserta el catálogo de ejercicios si la tabla está vacía.
+    No duplica datos si se llama más de una vez (usa INSERT OR IGNORE).
+    """
+    conn = get_connection()
+    for ej in ejercicios:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO ejercicios
+                (id, tema, titulo, enunciado, lenguaje, nivel, codigo_base, orden)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ej["id"], ej["tema"], ej["titulo"], ej["enunciado"],
+                ej["lenguaje"], ej["nivel"], ej["codigo_base"], ej["orden"],
+            ),
+        )
     conn.commit()
     conn.close()

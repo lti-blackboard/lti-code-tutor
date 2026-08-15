@@ -8,8 +8,9 @@ Levanta el servidor con:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import health, lti, ai
-from app.db import init_db
+from app.routers import health, lti, ai, ejercicios
+from app.db import init_db, cargar_catalogo_inicial
+from app.catalogo_ejercicios import CATALOGO_EJERCICIOS
 
 app = FastAPI(
     title="LTI Code Tutor API",
@@ -17,8 +18,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Crea la tabla de intentos en SQLite si aún no existe.
+# Crea las tablas si no existen, y carga el catálogo de ejercicios inicial
+# (no duplica datos si el servidor se reinicia varias veces).
 init_db()
+cargar_catalogo_inicial(CATALOGO_EJERCICIOS)
 
 # Habilita que el frontend (en otro puerto/dominio) pueda llamar a esta API.
 # En producción, reemplazar "*" por el dominio real del frontend.
@@ -35,3 +38,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(lti.router, prefix="/lti", tags=["LTI"])
 app.include_router(ai.router, prefix="/ai", tags=["IA / Tutor"])
+app.include_router(ejercicios.router, prefix="/ejercicios", tags=["Ejercicios"])
