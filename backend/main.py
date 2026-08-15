@@ -9,12 +9,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import health, lti, ai
+from app.db import init_db
 
 app = FastAPI(
     title="LTI Code Tutor API",
     description="Backend del sistema LTI-Blackboard con tutor de IA para Python y Java.",
     version="0.1.0",
 )
+
+# Crea la tabla de intentos en SQLite si aún no existe.
+init_db()
 
 # Habilita que el frontend (en otro puerto/dominio) pueda llamar a esta API.
 # En producción, reemplazar "*" por el dominio real del frontend.

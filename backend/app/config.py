@@ -19,5 +19,17 @@ class Settings:
     lti_client_id: str = os.getenv("LTI_CLIENT_ID", "")
     lti_issuer: str = os.getenv("LTI_ISSUER", "")
 
+    # Modelo de IA a usar — configurable sin tocar código.
+    modelo_ia: str = os.getenv("MODELO_IA", "claude-sonnet-4-6")
+
+    # Límites de validación de entradas.
+    max_caracteres_codigo: int = int(os.getenv("MAX_CARACTERES_CODIGO", "5000"))
+    max_caracteres_pregunta: int = int(os.getenv("MAX_CARACTERES_PREGUNTA", "500"))
+    lenguajes_permitidos: list = ["python", "java"]
+
+    # Rate limiting: máximo de consultas por sesión en la ventana de tiempo.
+    rate_limit_max_consultas: int = int(os.getenv("RATE_LIMIT_MAX_CONSULTAS", "15"))
+    rate_limit_ventana_minutos: int = int(os.getenv("RATE_LIMIT_VENTANA_MINUTOS", "10"))
+
 
 settings = Settings()
