@@ -1,7 +1,11 @@
 // Todas las llamadas al backend viven aquí, en un solo lugar.
-// Si más adelante cambia la URL del backend (por ejemplo, al subirlo
-// a un VPS en vez de localhost), solo hay que cambiar esta línea.
-const API_BASE = 'http://127.0.0.1:8000'
+//
+// La URL del backend se lee de una variable de entorno (VITE_API_BASE),
+// para poder apuntar a distintos backends sin tocar el código:
+// - En desarrollo local, no hace falta configurar nada: usa localhost por defecto.
+// - En producción (Vercel), se configura VITE_API_BASE con la URL real del
+//   backend desplegado en Render.
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 
 // El sesion_id identifica al estudiante durante su sesión en el navegador.
 // Se genera una sola vez y se guarda en localStorage, para que el backend
