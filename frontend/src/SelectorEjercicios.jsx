@@ -11,7 +11,7 @@ const NOMBRES_TEMA = {
   poo: 'Programación orientada a objetos',
 }
 
-export default function SelectorEjercicios({ onSeleccionar }) {
+export default function SelectorEjercicios({ onSeleccionar, onIrAPanelDocente }) {
   const [ejercicios, setEjercicios] = useState([])
   const [lenguaje, setLenguaje] = useState('python')
   const [cargando, setCargando] = useState(true)
@@ -48,19 +48,24 @@ export default function SelectorEjercicios({ onSeleccionar }) {
         <div className="brand">
           code<span>tutor</span>
         </div>
-        <div className="lang-toggle">
-          <button
-            className={lenguaje === 'python' ? 'lang-btn activo' : 'lang-btn'}
-            onClick={() => setLenguaje('python')}
-          >
-            Python
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button className="enlace-panel-docente" onClick={onIrAPanelDocente}>
+            Panel del profesor
           </button>
-          <button
-            className={lenguaje === 'java' ? 'lang-btn activo' : 'lang-btn'}
-            onClick={() => setLenguaje('java')}
-          >
-            Java
-          </button>
+          <div className="lang-toggle">
+            <button
+              className={lenguaje === 'python' ? 'lang-btn activo' : 'lang-btn'}
+              onClick={() => setLenguaje('python')}
+            >
+              Python
+            </button>
+            <button
+              className={lenguaje === 'java' ? 'lang-btn activo' : 'lang-btn'}
+              onClick={() => setLenguaje('java')}
+            >
+              Java
+            </button>
+          </div>
         </div>
       </div>
 
