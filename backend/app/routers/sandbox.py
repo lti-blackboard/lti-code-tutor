@@ -7,6 +7,12 @@ API key para uso ligero de desarrollo y pruebas. Tiene límites de uso
 un piloto real con muchos estudiantes, se recomienda migrar a la
 versión de RapidAPI (con key propia) o auto-hospedar Judge0.
 
+Las salidas (stdout, stderr, error de compilación) se truncan si son
+muy largas — esto pasa típicamente con errores de recursión infinita
+en Java (StackOverflowError), que generan tracebacks de miles de
+líneas repetidas. Truncar protege tanto la experiencia visual como el
+costo de tokens al mandarle ese texto al tutor de IA después.
+
 Referencia: https://ce.judge0.com/
 """
 
@@ -16,6 +22,7 @@ import httpx
 
 from app.config import settings
 from app.logger import logger
+from app.utils import truncar_texto
 
 router = APIRouter()
 
@@ -99,12 +106,10 @@ def ejecutar_codigo(consulta: ConsultaEjecucion):
             detail="Ocurrió un error inesperado al ejecutar el código.",
         )
 
-    # Judge0 devuelve varios campos; nos quedamos con los relevantes
-    # para mostrarle al estudiante un resultado claro.
     return {
-        "salida": resultado.get("stdout"),
-        "error": resultado.get("stderr"),
-        "error_compilacion": resultado.get("compile_output"),
+        "salida": truncar_texto(resultado.get("stdout")),
+        "error": truncar_texto(resultado.get("stderr")),
+        "error_compilacion": truncar_texto(resultado.get("compile_output")),
         "estado": resultado.get("status", {}).get("description"),
         "tiempo_segundos": resultado.get("time"),
         "memoria_kb": resultado.get("memory"),
