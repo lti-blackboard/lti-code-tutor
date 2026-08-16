@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { consultarTutor } from './api.js'
+import { consultarTutor, ejecutarCodigo } from './api.js'
 
 export default function Workspace({ ejercicio, onVolver }) {
   const [codigo, setCodigo] = useState(ejercicio.codigo_base)
@@ -11,6 +11,32 @@ export default function Workspace({ ejercicio, onVolver }) {
   const [mensajeSistema, setMensajeSistema] = useState(null)
   const [ofrecerDecision, setOfrecerDecision] = useState(false)
   const [intentoActual, setIntentoActual] = useState(0)
+
+  // Estado de la consola de ejecución (resultado real del sandbox).
+  const [consola, setConsola] = useState(null)
+  const [ejecutando, setEjecutando] = useState(false)
+
+  async function manejarEjecutar() {
+    setEjecutando(true)
+    setConsola(null)
+    try {
+      const resultado = await ejecutarCodigo({ codigo, lenguaje: ejercicio.lenguaje })
+      setConsola(resultado)
+
+      // Si el código falló (error de ejecución o de compilación), ofrecemos
+      // pasar ese error directo al campo de "error de consola" para el tutor,
+      // así el estudiante no tiene que copiarlo y pegarlo a mano.
+      const huboError = resultado.error || resultado.error_compilacion
+      if (huboError) {
+        setErrorConsola(resultado.error_compilacion || resultado.error)
+        setMostrarErrorConsola(true)
+      }
+    } catch (err) {
+      setConsola({ fallo: true, mensaje: err.message })
+    } finally {
+      setEjecutando(false)
+    }
+  }
 
   async function enviarPregunta(quiereRespuestaDirecta = false) {
     if (!quiereRespuestaDirecta && !pregunta.trim()) return
@@ -73,6 +99,9 @@ export default function Workspace({ ejercicio, onVolver }) {
         <div className="editor-panel">
           <div className="editor-topline">
             <span className="lang-pill">{ejercicio.lenguaje === 'python' ? 'Python' : 'Java'}</span>
+            <button className="run-btn" onClick={manejarEjecutar} disabled={ejecutando}>
+              {ejecutando ? 'Ejecutando…' : 'Ejecutar'}
+            </button>
           </div>
           <textarea
             className="editor-textarea"
@@ -80,12 +109,42 @@ export default function Workspace({ ejercicio, onVolver }) {
             onChange={(e) => setCodigo(e.target.value)}
             spellCheck={false}
           />
+
+          {consola && (
+            <div className="consola-panel">
+              <div className="consola-titulo">Consola</div>
+              {consola.fallo ? (
+                <div className="consola-linea consola-error">{consola.mensaje}</div>
+              ) : (
+                <>
+                  {consola.error_compilacion && (
+                    <pre className="consola-linea consola-error">{consola.error_compilacion}</pre>
+                  )}
+                  {consola.error && (
+                    <pre className="consola-linea consola-error">{consola.error}</pre>
+                  )}
+                  {consola.salida && (
+                    <pre className="consola-linea consola-ok">{consola.salida}</pre>
+                  )}
+                  {!consola.salida && !consola.error && !consola.error_compilacion && (
+                    <div className="consola-linea consola-vacio">
+                      El programa no produjo ninguna salida.
+                    </div>
+                  )}
+                  <div className="consola-estado">
+                    {consola.estado}
+                    {consola.tiempo_segundos && ` · ${consola.tiempo_segundos}s`}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="margen">
           {notas.length === 0 && (
             <div className="margen-vacio">
-              Escribe tu código y pregúntale al tutor cuando tengas una duda o un error.
+              Escribe tu código, ejecútalo, y pregúntale al tutor cuando tengas una duda o un error.
             </div>
           )}
 

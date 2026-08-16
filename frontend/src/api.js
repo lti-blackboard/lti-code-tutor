@@ -15,6 +15,21 @@ export function obtenerSesionId() {
   return sesionId
 }
 
+async function manejarRespuesta(respuesta) {
+  const datos = await respuesta.json()
+  if (!respuesta.ok) {
+    if (datos.detail) {
+      const mensaje =
+        typeof datos.detail === 'string'
+          ? datos.detail
+          : datos.detail.map((d) => d.msg).join(' ')
+      throw new Error(mensaje)
+    }
+    throw new Error('Ocurrió un error inesperado.')
+  }
+  return datos
+}
+
 export async function listarEjercicios() {
   const respuesta = await fetch(`${API_BASE}/ejercicios`)
   if (!respuesta.ok) throw new Error('No se pudo cargar la lista de ejercicios.')
@@ -42,21 +57,18 @@ export async function consultarTutor({
       quiere_respuesta_directa: quiereRespuestaDirecta || false,
     }),
   })
+  return manejarRespuesta(respuesta)
+}
 
-  const datos = await respuesta.json()
-
-  if (!respuesta.ok) {
-    // El backend ya devuelve mensajes claros en 'detail' (validación,
-    // rate limit, errores de la API de IA) — los propagamos tal cual.
-    if (datos.detail) {
-      const mensaje =
-        typeof datos.detail === 'string'
-          ? datos.detail
-          : datos.detail.map((d) => d.msg).join(' ')
-      throw new Error(mensaje)
-    }
-    throw new Error('Ocurrió un error inesperado al consultar al tutor.')
-  }
-
-  return datos
+export async function ejecutarCodigo({ codigo, lenguaje, entrada }) {
+  const respuesta = await fetch(`${API_BASE}/sandbox/ejecutar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      codigo,
+      lenguaje,
+      entrada: entrada || '',
+    }),
+  })
+  return manejarRespuesta(respuesta)
 }
