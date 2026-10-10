@@ -9,6 +9,18 @@ export default function Workspace({ ejercicio, onVolver }) {
   const [notas, setNotas] = useState([])
   const [cargando, setCargando] = useState(false)
   const [mensajeSistema, setMensajeSistema] = useState(null)
+  const [avisoPegado, setAvisoPegado] = useState(false)
+
+  // Bloqueo de pegado en el editor: el estudiante debe escribir el código
+  // para practicar. Cubre Ctrl+V, "Pegar" del menú y arrastrar texto.
+  // No es infalible (se puede saltar con las herramientas del navegador);
+  // el objetivo es que copiar no sea el camino fácil.
+  // La caja del error de consola NO lleva este bloqueo: está hecha para pegar.
+  function bloquearPegado(e) {
+    e.preventDefault()
+    setAvisoPegado(true)
+    setTimeout(() => setAvisoPegado(false), 3000)
+  }
   const [ofrecerDecision, setOfrecerDecision] = useState(false)
   const [intentoActual, setIntentoActual] = useState(0)
 
@@ -107,8 +119,15 @@ export default function Workspace({ ejercicio, onVolver }) {
             className="editor-textarea"
             value={codigo}
             onChange={(e) => setCodigo(e.target.value)}
+            onPaste={bloquearPegado}
+            onDrop={bloquearPegado}
             spellCheck={false}
           />
+          {avisoPegado && (
+            <div className="aviso-pegado" role="status">
+              Pegar código está desactivado en el editor: escríbelo tú para practicar.
+            </div>
+          )}
 
           {consola && (
             <div className="consola-panel">

@@ -645,3 +645,13 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--amber);
   font-weight: 600;
 }
+
+/* Aviso al intentar pegar en el editor */
+.aviso-pegado {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fff4dc;
+  color: #7a4b00;
+  font-size: 14px;
+}
