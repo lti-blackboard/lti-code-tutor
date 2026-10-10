@@ -40,6 +40,15 @@ export async function listarEjercicios() {
   return respuesta.json()
 }
 
+// Estado de cada ejercicio para esta sesión: "en_progreso" o "resuelto"
+// (los que no aparecen están sin empezar).
+export async function obtenerEstados() {
+  const params = new URLSearchParams({ sesion_id: obtenerSesionId() })
+  const respuesta = await fetch(`${API_BASE}/ejercicios/estado?${params}`)
+  if (!respuesta.ok) throw new Error('No se pudo cargar el estado de los ejercicios.')
+  return respuesta.json()
+}
+
 export async function consultarTutor({
   codigo,
   pregunta,
