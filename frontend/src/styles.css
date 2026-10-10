@@ -1241,7 +1241,7 @@ a { color: var(--ct-enlace); }
 .ct-editor { display: flex; flex-direction: column; }
 .ct-editor-cuerpo {
   display: flex; font-family: var(--ct-fuente-codigo); font-size: 16px; line-height: 1.85;
-  height: 340px; padding: 14px 0; box-sizing: border-box;
+  min-height: 340px; padding: 14px 0; box-sizing: border-box;
 }
 .ct-editor-numeros {
   width: 52px; flex: none; text-align: right; padding-right: 16px; color: #6E6E78; overflow: hidden; user-select: none;
@@ -1255,6 +1255,7 @@ a { color: var(--ct-enlace); }
 }
 .ct-editor-capa { color: #E8E8EC; pointer-events: none; overflow: hidden; }
 .ct-editor-area {
+  overflow-y: hidden;
   background: transparent; color: transparent; caret-color: #FFFFFF; resize: none; outline: none; z-index: 1;
 }
 .ct-editor-area::selection { background: rgba(142,197,255,.35); color: transparent; }
@@ -1355,7 +1356,7 @@ a { color: var(--ct-enlace); }
   .ct-ejercicio-titulo { font-size: 27px; }
   .ct-navegacion { align-items: flex-start; }
   .ct-nav-botones { justify-content: flex-start; }
-  .ct-editor-cuerpo { font-size: 14px; height: 300px; }
+  .ct-editor-cuerpo { font-size: 14px; min-height: 300px; }
   .ct-editor-numeros { width: 38px; padding-right: 10px; }
 }
 .ct-msj-burbuja .ct-msj-codigo {
@@ -1364,3 +1365,11 @@ a { color: var(--ct-enlace); }
 }
 .ct-msj-burbuja .ct-msj-codigo code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
 .ct-msj-burbuja .ct-msj-codigo:last-child { margin-bottom: 0; }
+
+.ct-aviso-consultas {
+  font-size: 13.5px; line-height: 1.45; color: #45454B; background: var(--ct-fondo);
+  border: 1px solid var(--ct-borde); border-radius: 10px; padding: 8px 12px;
+}
+.ct-aviso-consultas-limite { color: #8F3504; background: #FFF4EC; border-color: #F5CBAE; font-weight: 500; }
+.ct-oferta-acc:disabled { opacity: .5; cursor: default; }
+.ct-tutor-entrada input:disabled { background: var(--ct-fondo); color: #8A8A95; border-color: var(--ct-borde); }

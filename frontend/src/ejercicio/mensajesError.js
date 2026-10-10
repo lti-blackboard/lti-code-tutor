@@ -25,7 +25,7 @@ const REGLAS_JAVA = [
   [/incompatible types/, 'Tipos incompatibles', 'Estás guardando o usando un valor de un tipo distinto al esperado.'],
   [/missing return statement/, 'Falta un return', 'El método debe devolver un valor en todos los caminos posibles, también cuando el if no se cumple.'],
   [/bad operand types/, 'Operación no válida para esos tipos', 'El operador no se puede usar con esos tipos de datos.'],
-  [/unexpected type/, 'Tipo inesperado', 'En esa posición Java espera otra cosa, por ejemplo una variable para asignar. ¿Querías comparar con == en vez de asignar con =?'],
+  [/unexpected type/, 'Tipo inesperado', 'En esa posición Java esperaba una variable y encontró un valor. Revisa si en esa línea quieres guardar un valor o comparar dos valores.'],
   [/cannot be applied to given types|no suitable method found/, 'Parámetros que no coinciden', 'Llamaste a un método con una cantidad o tipo de valores distinto al que recibe.'],
   [/char cannot be converted|cannot be converted to/, 'Conversión no permitida', 'Java no puede convertir automáticamente ese valor al tipo que se pide.'],
   [/class \w+ is public, should be declared in a file named/, 'Nombre de la clase', 'La clase pública debe llamarse igual que el archivo (Main).'],

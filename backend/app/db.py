@@ -168,6 +168,31 @@ def contar_consultas_recientes(sesion_id: str, ventana_minutos: int) -> int:
     return fila["total"]
 
 
+def segundos_para_nueva_consulta(sesion_id: str, ventana_minutos: int) -> int:
+    """
+    Segundos que faltan para que la consulta más antigua de la ventana deje
+    de contar (es decir, para que se libere un cupo). 0 si no hay consultas.
+    """
+    ahora = datetime.utcnow()
+    limite_tiempo = ahora - timedelta(minutes=ventana_minutos)
+    limite = limite_tiempo if USA_POSTGRES else limite_tiempo.strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    fila = conn.execute(
+        "SELECT MIN(creado_en) AS primera FROM intentos WHERE sesion_id = ? AND creado_en >= ?",
+        (sesion_id, limite),
+    ).fetchone()
+    conn.close()
+    primera = fila["primera"]
+    if not primera:
+        return 0
+    if isinstance(primera, str):
+        primera = datetime.strptime(primera[:19], "%Y-%m-%d %H:%M:%S")
+    if primera.tzinfo is not None:
+        primera = primera.replace(tzinfo=None)
+    libera = primera + timedelta(minutes=ventana_minutos)
+    return max(0, int((libera - ahora).total_seconds()) + 1)
+
+
 def registrar_intento(
     sesion_id: str, ejercicio_id: str, pregunta: str, pidio_respuesta_directa: bool
 ):

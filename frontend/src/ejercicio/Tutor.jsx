@@ -16,7 +16,7 @@ function IconoAmpolleta({ color = 'currentColor', tam = 20 }) {
  * mensajes: [{ rol: 'estudiante' | 'pista' | 'explicacion', texto }]
  */
 export default function Tutor({
-  mensajes, cargando, errorSistema, ofrecerDecision, consultas, adjunto,
+  mensajes, cargando, errorSistema, ofrecerDecision, avisoConsultas, bloqueado, adjunto,
   onPreguntar, onSeguir, onExplicar,
 }) {
   const [pregunta, setPregunta] = useState('')
@@ -28,7 +28,7 @@ export default function Tutor({
 
   function enviar() {
     const texto = pregunta.trim()
-    if (!texto || cargando) return
+    if (!texto || cargando || bloqueado) return
     onPreguntar(texto)
     setPregunta('')
   }
@@ -45,11 +45,6 @@ export default function Tutor({
             <span className="ct-tutor-bajada">Te orienta sin darte la solución</span>
           </div>
         </div>
-        {consultas && (
-          <span className="ct-tutor-contador" title="Consultas usadas en la ventana de tiempo">
-            {consultas.consultas_usadas} de {consultas.consultas_maximas} consultas · {consultas.ventana_minutos} min
-          </span>
-        )}
       </div>
 
       <div className="ct-tutor-mensajes" aria-live="polite">
@@ -82,7 +77,7 @@ export default function Tutor({
             <span>Llevas un par de intentos. ¿Seguimos con pistas o prefieres que te explique el concepto?</span>
             <div className="ct-oferta-botones">
               <button type="button" className="ct-oferta-sec" onClick={onSeguir}>Sigo intentando</button>
-              <button type="button" className="ct-oferta-acc" onClick={onExplicar}>Explícamelo</button>
+              <button type="button" className="ct-oferta-acc" onClick={onExplicar} disabled={bloqueado}>Explícamelo</button>
             </div>
           </div>
         )}
@@ -90,6 +85,11 @@ export default function Tutor({
       </div>
 
       <div className="ct-tutor-pie">
+        {avisoConsultas && (
+          <div className={bloqueado ? 'ct-aviso-consultas ct-aviso-consultas-limite' : 'ct-aviso-consultas'} role="status">
+            {avisoConsultas}
+          </div>
+        )}
         <span className="ct-adjunto">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B84506" strokeWidth="2.4"
             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -107,9 +107,9 @@ export default function Tutor({
             maxLength={500}
             onChange={(e) => setPregunta(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && enviar()}
-            disabled={cargando}
+            disabled={cargando || bloqueado}
           />
-          <button type="button" aria-label="Enviar pregunta" onClick={enviar} disabled={cargando || !pregunta.trim()}>
+          <button type="button" aria-label="Enviar pregunta" onClick={enviar} disabled={cargando || bloqueado || !pregunta.trim()}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
               strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />

@@ -75,11 +75,35 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
   const [cargandoTutor, setCargandoTutor] = useState(false)
   const [errorTutor, setErrorTutor] = useState(null)
   const [ofrecerDecision, setOfrecerDecision] = useState(false)
+  // Límite de consultas al tutor (compartido por todos los ejercicios, en una
+  // ventana móvil). Solo se muestra cuando quedan pocas o se llegó al límite.
   const [consultas, setConsultas] = useState(null)
+  const [disponibleEn, setDisponibleEn] = useState(null) // ms (Date.now) en que se libera un cupo
+  const [ahora, setAhora] = useState(Date.now())
 
+  function actualizarConsultas() {
+    obtenerConsultas()
+      .then((c) => {
+        setConsultas(c)
+        setDisponibleEn(c.segundos_para_nueva_consulta > 0 ? Date.now() + c.segundos_para_nueva_consulta * 1000 : null)
+        setAhora(Date.now())
+      })
+      .catch(() => {})
+  }
+
+  useEffect(actualizarConsultas, [])
+
+  // Mientras está bloqueado, se actualiza el tiempo restante y, al cumplirse,
+  // se vuelve a consultar el contador.
   useEffect(() => {
-    obtenerConsultas().then(setConsultas).catch(() => setConsultas(null))
-  }, [])
+    if (!disponibleEn) return undefined
+    const id = setInterval(() => {
+      const t = Date.now()
+      setAhora(t)
+      if (t >= disponibleEn) actualizarConsultas()
+    }, 15000)
+    return () => clearInterval(id)
+  }, [disponibleEn])
 
   useEffect(() => {
     try {
@@ -145,12 +169,30 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
       })
       setMensajes((m) => [...m, { rol: quiereRespuestaDirecta ? 'explicacion' : 'pista', texto: r.respuesta }])
       setOfrecerDecision(r.se_ofrecio_respuesta_directa)
-      if (r.consultas_maximas) setConsultas(r)
+      if (r.consultas_maximas) {
+        setConsultas(r)
+        if (r.consultas_usadas >= r.consultas_maximas) actualizarConsultas()
+      }
     } catch (err) {
       setErrorTutor(err.message)
+      actualizarConsultas()
     } finally {
       setCargandoTutor(false)
     }
+  }
+
+  const restantes = consultas ? Math.max(0, consultas.consultas_maximas - consultas.consultas_usadas) : null
+  const bloqueado = restantes === 0
+  let avisoConsultas = null
+  if (bloqueado) {
+    const minutos = disponibleEn ? Math.max(1, Math.ceil((disponibleEn - ahora) / 60000)) : null
+    avisoConsultas = minutos
+      ? `Llegaste al límite de consultas. Podrás volver a preguntar en ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}.`
+      : 'Llegaste al límite de consultas. Podrás volver a preguntar en unos minutos.'
+  } else if (restantes !== null && restantes <= 5) {
+    avisoConsultas = restantes === 1
+      ? 'Te queda 1 consulta en los próximos minutos para cualquier ejercicio.'
+      : `Te quedan ${restantes} consultas en los próximos minutos para cualquier ejercicio.`
   }
 
   let adjunto = 'Se enviará tu código'
@@ -296,7 +338,8 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
           cargando={cargandoTutor}
           errorSistema={errorTutor}
           ofrecerDecision={ofrecerDecision}
-          consultas={consultas}
+          avisoConsultas={avisoConsultas}
+          bloqueado={bloqueado}
           adjunto={adjunto}
           onPreguntar={(texto) => preguntar(texto)}
           onSeguir={() => setOfrecerDecision(false)}

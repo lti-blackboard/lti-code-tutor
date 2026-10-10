@@ -46,6 +46,7 @@ from app.config import settings
 from app.db import (
     contar_intentos,
     contar_consultas_recientes,
+    segundos_para_nueva_consulta,
     registrar_intento,
     obtener_ejercicio,
 )
@@ -283,13 +284,21 @@ class ConsultaTutor(BaseModel):
 
 @router.get("/consultas")
 def consultas_disponibles(sesion_id: str):
-    """Consultas al tutor usadas por la sesión en la ventana de tiempo actual."""
+    """
+    Consultas al tutor usadas por la sesión en la ventana de tiempo actual
+    (en todos los ejercicios). Si llegó al límite, indica en cuántos segundos
+    podrá volver a preguntar.
+    """
+    usadas = contar_consultas_recientes(sesion_id, settings.rate_limit_ventana_minutos)
+    al_limite = usadas >= settings.rate_limit_max_consultas
     return {
-        "consultas_usadas": contar_consultas_recientes(
-            sesion_id, settings.rate_limit_ventana_minutos
-        ),
+        "consultas_usadas": usadas,
         "consultas_maximas": settings.rate_limit_max_consultas,
         "ventana_minutos": settings.rate_limit_ventana_minutos,
+        "segundos_para_nueva_consulta": (
+            segundos_para_nueva_consulta(sesion_id, settings.rate_limit_ventana_minutos)
+            if al_limite else 0
+        ),
     }
 
 

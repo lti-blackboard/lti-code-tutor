@@ -94,7 +94,9 @@ export default function Editor({ codigo, onCambio, lenguaje, lineaError, onPegad
 
   return (
     <div className="ct-editor">
-      <div className="ct-editor-cuerpo">
+      {/* El editor crece con el código: así los números de línea y el texto
+          nunca se desalinean por un desplazamiento vertical interno. */}
+      <div className="ct-editor-cuerpo" style={{ height: `calc(${lineas.length} * 1.85em + 52px)` }}>
         <div className="ct-editor-numeros" ref={numerosRef} aria-hidden="true">
           {lineas.map((_, i) => (
             <div key={i} className={i + 1 === lineaError ? 'ct-num-error' : undefined}>{i + 1}</div>
