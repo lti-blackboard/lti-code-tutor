@@ -24,8 +24,13 @@ function formatearFecha(fechaTexto) {
 export default function PanelDocente({ onVolver }) {
   const [resumen, setResumen] = useState(null)
   const [alertas, setAlertas] = useState([])
+  const [sugerencias, setSugerencias] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
+
+  // Análisis de las preguntas con IA (a pedido, porque consume la API).
+  const [analisis, setAnalisis] = useState(null)
+  const [analizando, setAnalizando] = useState(false)
 
   // Estado del modal de detalle.
   const [detalleAbierto, setDetalleAbierto] = useState(false)
@@ -36,14 +41,32 @@ export default function PanelDocente({ onVolver }) {
     Promise.all([
       fetch(`${API_BASE}/docente/resumen`).then((r) => r.json()),
       fetch(`${API_BASE}/docente/alertas`).then((r) => r.json()),
+      fetch(`${API_BASE}/docente/sugerencias`)
+        .then((r) => r.json())
+        .catch(() => ({ sugerencias: [] })),
     ])
-      .then(([resumenData, alertasData]) => {
+      .then(([resumenData, alertasData, sugerenciasData]) => {
         setResumen(resumenData)
         setAlertas(alertasData.alertas)
+        setSugerencias(sugerenciasData.sugerencias || [])
       })
       .catch(() => setError('No se pudo conectar con el backend.'))
       .finally(() => setCargando(false))
   }, [])
+
+  async function pedirAnalisis() {
+    setAnalizando(true)
+    try {
+      const respuesta = await fetch(`${API_BASE}/docente/analisis-ia`, { method: 'POST' })
+      const datos = await respuesta.json()
+      if (!respuesta.ok) throw new Error(datos.detail || 'Error')
+      setAnalisis(datos)
+    } catch (err) {
+      setAnalisis({ error: err.message || 'No se pudo generar el análisis.' })
+    } finally {
+      setAnalizando(false)
+    }
+  }
 
   async function abrirDetalle(sesionId, ejercicioId) {
     setDetalleAbierto(true)
@@ -98,6 +121,39 @@ export default function PanelDocente({ onVolver }) {
           <div className="kpi-numero">{kpis.porcentaje_pidio_directa}%</div>
           <div className="kpi-etiqueta">Pidió explicación directa</div>
         </div>
+        <div className="kpi-card">
+          <div className="kpi-numero">{kpis.porcentaje_sin_errores ?? 0}%</div>
+          <div className="kpi-etiqueta">
+            Ejercicios ejecutados sin errores ({kpis.ejercicios_sin_errores ?? 0} de{' '}
+            {kpis.ejercicios_trabajados ?? 0})
+          </div>
+        </div>
+      </div>
+
+      <div className="seccion-titulo">Sugerencias para el docente</div>
+      <div className="sugerencias">
+        {sugerencias.map((s, i) => (
+          <div className={`sugerencia sugerencia-${s.tipo}`} key={i}>
+            {s.texto}
+          </div>
+        ))}
+        <div className="analisis-ia">
+          {!analisis && (
+            <button className="analisis-btn" onClick={pedirAnalisis} disabled={analizando}>
+              {analizando ? 'Analizando preguntas…' : 'Analizar las preguntas con IA'}
+            </button>
+          )}
+          {analisis && !analisis.error && (
+            <div className="analisis-texto">
+              <div className="analisis-meta">
+                Análisis con IA de {analisis.preguntas_analizadas} preguntas recientes. Es una
+                ayuda para interpretar los datos, no un diagnóstico.
+              </div>
+              {analisis.analisis}
+            </div>
+          )}
+          {analisis?.error && <div className="mensaje-sistema">{analisis.error}</div>}
+        </div>
       </div>
 
       <div className="seccion-titulo">Alertas</div>
@@ -113,6 +169,9 @@ export default function PanelDocente({ onVolver }) {
               <div className="alerta-texto">
                 Sesión <b>{a.sesion_id}</b> lleva <b>{a.intentos} intentos</b> en "{a.titulo}" (
                 {a.lenguaje})
+                <span className={a.ejecuto_sin_errores ? 'estado-ok' : 'estado-pendiente'}>
+                  {a.ejecuto_sin_errores ? 'Ya lo ejecutó sin errores' : 'Aún sin ejecutar sin errores'}
+                </span>
               </div>
               <button
                 className="alerta-badge alerta-badge-btn"
@@ -134,6 +193,7 @@ export default function PanelDocente({ onVolver }) {
               <th>Lenguaje</th>
               <th>Consultas</th>
               <th>Prom. intentos</th>
+              <th>Sin errores</th>
               <th>Dificultad percibida</th>
             </tr>
           </thead>
@@ -149,6 +209,9 @@ export default function PanelDocente({ onVolver }) {
                 </td>
                 <td>{ej.total_consultas}</td>
                 <td>{ej.promedio_intentos}</td>
+                <td>
+                  {ej.sesiones_sin_errores ?? 0} de {ej.sesiones_unicas}
+                </td>
                 <td>
                   <div className="barra-dificultad">
                     <div

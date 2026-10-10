@@ -49,7 +49,11 @@ export default function Workspace({ ejercicio, onVolver }) {
     setEjecutando(true)
     setConsola(null)
     try {
-      const resultado = await ejecutarCodigo({ codigo, lenguaje: ejercicio.lenguaje })
+      const resultado = await ejecutarCodigo({
+        codigo,
+        lenguaje: ejercicio.lenguaje,
+        ejercicioId: ejercicio.id,
+      })
       setConsola(resultado)
 
       // Si el código falló (error de ejecución o de compilación), ofrecemos

@@ -18,9 +18,11 @@ Referencia: https://ce.judge0.com/
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
+from typing import Optional
 import httpx
 
 from app.config import settings
+from app.db import registrar_ejecucion
 from app.logger import logger
 from app.utils import truncar_texto
 
@@ -42,6 +44,9 @@ class ConsultaEjecucion(BaseModel):
     codigo: str
     lenguaje: str
     entrada: str = ""  # lo que el programa recibiría por stdin (input()), opcional
+    # Opcionales: si vienen, la ejecución se registra para el panel docente.
+    sesion_id: Optional[str] = None
+    ejercicio_id: Optional[str] = None
 
     @field_validator("codigo")
     @classmethod
@@ -105,6 +110,19 @@ def ejecutar_codigo(consulta: ConsultaEjecucion):
             status_code=500,
             detail="Ocurrió un error inesperado al ejecutar el código.",
         )
+
+    estado = resultado.get("status", {}).get("description")
+    exitosa = (
+        estado == "Accepted"
+        and not resultado.get("stderr")
+        and not resultado.get("compile_output")
+    )
+    if consulta.sesion_id and consulta.ejercicio_id:
+        try:
+            registrar_ejecucion(consulta.sesion_id, consulta.ejercicio_id, exitosa)
+        except Exception as error:
+            # Registrar es secundario: nunca debe impedir mostrar el resultado.
+            logger.error(f"No se pudo registrar la ejecución: {repr(error)}")
 
     return {
         "salida": truncar_texto(resultado.get("stdout")),

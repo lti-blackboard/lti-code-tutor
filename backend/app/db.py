@@ -90,6 +90,17 @@ def init_db():
         """
     )
     conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS ejecuciones (
+            {columnas_id},
+            sesion_id TEXT NOT NULL,
+            ejercicio_id TEXT NOT NULL,
+            exitosa INTEGER NOT NULL,
+            creado_en TIMESTAMP DEFAULT {fecha_por_defecto}
+        )
+        """
+    )
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS ejercicios (
             id TEXT PRIMARY KEY,
@@ -142,6 +153,26 @@ def registrar_intento(
     )
     conn.commit()
     conn.close()
+
+
+def registrar_ejecucion(sesion_id: str, ejercicio_id: str, exitosa: bool):
+    """Registra cada ejecución de código: sirve para saber quién logró
+    ejecutar el ejercicio sin errores (y quién no)."""
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO ejecuciones (sesion_id, ejercicio_id, exitosa) VALUES (?, ?, ?)",
+        (sesion_id, ejercicio_id, int(exitosa)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _pares_con_exito(conn):
+    """Conjunto de (sesion_id, ejercicio_id) con al menos una ejecución sin errores."""
+    filas = conn.execute(
+        "SELECT DISTINCT sesion_id, ejercicio_id FROM ejecuciones WHERE exitosa = 1"
+    ).fetchall()
+    return {(f["sesion_id"], f["ejercicio_id"]) for f in filas}
 
 
 def listar_ejercicios(lenguaje: str = None, tema: str = None):
@@ -219,6 +250,19 @@ def obtener_kpis():
         "SELECT COUNT(*) AS total FROM intentos WHERE pidio_respuesta_directa = 1"
     ).fetchone()["total"]
 
+    # Ejercicios trabajados: cada combinación sesión + ejercicio con alguna
+    # consulta al tutor o alguna ejecución.
+    trabajados = conn.execute(
+        """
+        SELECT COUNT(*) AS total FROM (
+            SELECT sesion_id, ejercicio_id FROM intentos
+            UNION
+            SELECT sesion_id, ejercicio_id FROM ejecuciones
+        ) t
+        """
+    ).fetchone()["total"]
+    con_exito = len(_pares_con_exito(conn))
+
     conn.close()
 
     porcentaje_directa = (
@@ -230,6 +274,9 @@ def obtener_kpis():
         "estudiantes_activos": estudiantes_activos,
         "estudiantes_atascados": estudiantes_atascados,
         "porcentaje_pidio_directa": porcentaje_directa,
+        "ejercicios_trabajados": trabajados,
+        "ejercicios_sin_errores": con_exito,
+        "porcentaje_sin_errores": round((con_exito / trabajados) * 100) if trabajados else 0,
     }
 
 
@@ -250,6 +297,7 @@ def obtener_resumen_por_ejercicio():
         ORDER BY total_consultas DESC
         """
     ).fetchall()
+    con_exito = _pares_con_exito(conn)
     conn.close()
 
     resultado = []
@@ -268,6 +316,9 @@ def obtener_resumen_por_ejercicio():
                 "total_consultas": fila["total_consultas"],
                 "sesiones_unicas": fila["sesiones_unicas"],
                 "promedio_intentos": promedio,
+                "sesiones_sin_errores": sum(
+                    1 for (_, ej) in con_exito if ej == fila["ejercicio_id"]
+                ),
             }
         )
     return resultado
@@ -291,6 +342,7 @@ def obtener_alertas():
         """,
         (UMBRAL_ATASCADO,),
     ).fetchall()
+    con_exito = _pares_con_exito(conn)
     conn.close()
 
     return [
@@ -300,9 +352,51 @@ def obtener_alertas():
             "titulo": fila["titulo"] or fila["ejercicio_id"],
             "lenguaje": fila["lenguaje"] or "-",
             "intentos": fila["intentos"],
+            "ejecuto_sin_errores": (fila["sesion_id"], fila["ejercicio_id"]) in con_exito,
         }
         for fila in filas
     ]
+
+
+def obtener_preguntas_recientes(limite_por_ejercicio: int = 25, max_ejercicios: int = 5):
+    """
+    Preguntas al tutor de los ejercicios con más consultas, para que la IA
+    pueda identificar dificultades comunes del curso.
+    """
+    conn = get_connection()
+    top = conn.execute(
+        """
+        SELECT i.ejercicio_id, e.titulo, e.tema, e.lenguaje, COUNT(*) AS total
+        FROM intentos i
+        LEFT JOIN ejercicios e ON e.id = i.ejercicio_id
+        GROUP BY i.ejercicio_id, e.titulo, e.tema, e.lenguaje
+        ORDER BY total DESC
+        LIMIT ?
+        """,
+        (max_ejercicios,),
+    ).fetchall()
+    resultado = []
+    for t in top:
+        preguntas = conn.execute(
+            """
+            SELECT pregunta, pidio_respuesta_directa FROM intentos
+            WHERE ejercicio_id = ?
+            ORDER BY creado_en DESC
+            LIMIT ?
+            """,
+            (t["ejercicio_id"], limite_por_ejercicio),
+        ).fetchall()
+        resultado.append(
+            {
+                "titulo": t["titulo"] or t["ejercicio_id"],
+                "tema": t["tema"] or "sin catalogar",
+                "lenguaje": t["lenguaje"] or "-",
+                "total_consultas": t["total"],
+                "preguntas": [p["pregunta"] for p in preguntas],
+            }
+        )
+    conn.close()
+    return resultado
 
 
 def obtener_detalle_sesion_ejercicio(sesion_id: str, ejercicio_id: str):

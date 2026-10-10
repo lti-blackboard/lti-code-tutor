@@ -68,7 +68,7 @@ export async function consultarTutor({
   return manejarRespuesta(respuesta)
 }
 
-export async function ejecutarCodigo({ codigo, lenguaje, entrada }) {
+export async function ejecutarCodigo({ codigo, lenguaje, entrada, ejercicioId }) {
   const respuesta = await fetch(`${API_BASE}/sandbox/ejecutar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -76,6 +76,9 @@ export async function ejecutarCodigo({ codigo, lenguaje, entrada }) {
       codigo,
       lenguaje,
       entrada: entrada || '',
+      // Para que el panel docente sepa quién logró ejecutar sin errores.
+      sesion_id: obtenerSesionId(),
+      ejercicio_id: ejercicioId || null,
     }),
   })
   return manejarRespuesta(respuesta)
