@@ -3,7 +3,9 @@ Endpoint del tutor de IA.
 
 Comportamiento pedagógico:
 - Intentos 1 y 2 sobre el mismo ejercicio: la IA da solo pistas guiadas,
-  nunca la solución.
+  nunca la solución. Las pistas son graduadas: la primera explica el tipo
+  de problema, la segunda señala la línea y el elemento a observar, y desde
+  la tercera explica por qué falla ese elemento, sin decir qué cambiar.
 - Al llegar al intento 2: además de la pista, la IA le pregunta al
   estudiante si prefiere que le expliquen la solución directamente, o
   seguir intentando por su cuenta.
@@ -89,6 +91,44 @@ Estado de la ejecución (viene indicado en el mensaje):
   que lo vuelva a ejecutar para confirmar.
 """
 
+# Pistas graduadas: cada consulta sobre el mismo ejercicio da una pista un
+# poco más concreta que la anterior, pero ninguna dice qué cambiar.
+REGLA_PISTA_NO_SOLUCION = """
+Qué cuenta como entregar la solución (prohibido en una pista):
+- Decir qué cambio hacer, por ejemplo "quita las comillas", "cambia = por =="
+  o "usa range(1, n + 1)".
+- Disfrazar ese cambio de pregunta, por ejemplo "¿qué pasaría si quitas las
+  comillas?". Eso es la solución, no una pista.
+- Mostrar cómo debería quedar la línea corregida.
+"""
+
+
+def instruccion_nivel_pista(intento: int) -> str:
+    if intento <= 1:
+        return """
+Nivel de esta pista: 1 de 3 (la más general).
+Ayuda al estudiante a entender QUÉ tipo de problema tiene, no DÓNDE ni CÓMO
+arreglarlo. Explica en palabras simples el concepto detrás del error (por
+ejemplo, que Python distingue entre números y textos) y hazle una pregunta
+para que revise su propio código. Puedes mencionar la función o la zona del
+código, pero no señales el valor o el símbolo exacto que está mal.
+"""
+    if intento == 2:
+        return """
+Nivel de esta pista: 2 de 3.
+Ahora puedes indicar la línea exacta donde está el problema y qué elemento
+de esa línea conviene observar (una variable, un operador, un valor), pero
+sin decir qué cambio hacer. Guíalo con una pregunta sobre ese elemento.
+"""
+    return """
+Nivel de esta pista: 3 de 3 (la más concreta).
+Indica la línea y el elemento exacto, y explica por qué ese elemento produce
+el error o el resultado incorrecto. Aun así, no digas qué cambio hacer: deja
+que el estudiante lo deduzca. Si sigue trabado, puede pedir la explicación
+directa con el botón de la pantalla.
+"""
+
+
 FORMATO_RESPUESTA = """
 Formato de tu respuesta (obligatorio):
 - Breve: {limite}. Ve directo al punto.
@@ -125,11 +165,15 @@ lenguaje claro y evita la jerga técnica innecesaria.
 Reglas:
 - Nunca entregues la solución completa ni el código corregido.
 - Guía con preguntas o pistas que ayuden al estudiante a encontrar el error por sí mismo.
+- Si el código ya funciona y cumple el enunciado, no apliques el nivel de
+  pista: confírmale que está correcto.
 - Identifica si el error es de sintaxis, de lógica, o de un concepto mal entendido,
   y adapta tu respuesta según ese tipo de error.
 - Si es útil, sugiere qué término buscar en la documentación oficial o en Google
   (por ejemplo: "prueba buscar: TypeError sum NoneType python"), sin inventar URLs.
 - Sé claro y alentador, y termina con una pregunta o una acción concreta.
+
+{REGLA_PISTA_NO_SOLUCION}
 
 {FORMATO_RESPUESTA.format(limite="máximo 3 o 4 frases, unas 70 palabras")}
 
@@ -149,6 +193,8 @@ concreta que la anterior.
 
 No le preguntes si quiere la explicación directa: la pantalla ya le muestra
 botones para elegir entre seguir intentando o pedir la explicación.
+
+{REGLA_PISTA_NO_SOLUCION}
 
 {FORMATO_RESPUESTA.format(limite="máximo 3 o 4 frases, unas 70 palabras")}
 
@@ -272,9 +318,9 @@ def consultar_tutor(consulta: ConsultaTutor):
     if consulta.quiere_respuesta_directa:
         system_prompt = SYSTEM_PROMPT_RESPUESTA_DIRECTA
     elif intento_actual >= UMBRAL_OFRECER_RESPUESTA and not codigo_funciona:
-        system_prompt = SYSTEM_PROMPT_OFRECER_AYUDA
+        system_prompt = SYSTEM_PROMPT_OFRECER_AYUDA + instruccion_nivel_pista(intento_actual)
     else:
-        system_prompt = SYSTEM_PROMPT_PISTA
+        system_prompt = SYSTEM_PROMPT_PISTA + instruccion_nivel_pista(intento_actual)
 
     # Truncar el error de consola (protección extra, además de la que ya
     # hace el sandbox) — evita gastar tokens de más si alguien pega un
