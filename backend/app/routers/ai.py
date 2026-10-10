@@ -242,7 +242,17 @@ def consultar_tutor(consulta: ConsultaTutor):
     contenido = f"Lenguaje: {consulta.lenguaje}\n\n"
     if ejercicio:
         contenido += f"Enunciado del ejercicio:\n{ejercicio['enunciado']}\n\n"
-    contenido += f"Código del estudiante:\n{consulta.codigo}\n\n"
+    # El código va numerado igual que en el editor, para que cuando el tutor
+    # diga "revisa la línea 5" el estudiante la encuentre de inmediato.
+    codigo_numerado = "\n".join(
+        f"{numero:>3} | {linea}"
+        for numero, linea in enumerate(consulta.codigo.split("\n"), start=1)
+    )
+    contenido += (
+        "Código del estudiante (con el número de línea que el estudiante ve "
+        "en su editor; cuando menciones una línea, usa ese número):\n"
+        f"{codigo_numerado}\n\n"
+    )
 
     if consulta.estado_ejecucion == "ok":
         salida = truncar_texto(consulta.salida_consola) or "(sin salida)"

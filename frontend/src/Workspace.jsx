@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { consultarTutor, ejecutarCodigo } from './api.js'
 
 export default function Workspace({ ejercicio, onVolver }) {
@@ -35,6 +35,13 @@ export default function Workspace({ ejercicio, onVolver }) {
   // true si el texto de "error de consola" lo puso el sistema al ejecutar
   // (y no el estudiante a mano): ese error se descarta cuando ya no aplica.
   const [errorAutomatico, setErrorAutomatico] = useState(false)
+
+  // Números de línea del editor: la columna se desplaza junto con el texto.
+  const numerosRef = useRef(null)
+  const totalLineas = codigo.split('\n').length
+  function sincronizarScroll(e) {
+    if (numerosRef.current) numerosRef.current.scrollTop = e.target.scrollTop
+  }
 
   const ejecucionVigente = ultimaEjecucion !== null && ultimaEjecucion.codigo === codigo
 
@@ -141,14 +148,24 @@ export default function Workspace({ ejercicio, onVolver }) {
               {ejecutando ? 'Ejecutando…' : 'Ejecutar'}
             </button>
           </div>
-          <textarea
-            className="editor-textarea"
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value)}
-            onPaste={bloquearPegado}
-            onDrop={bloquearPegado}
-            spellCheck={false}
-          />
+          <div className="editor-cuerpo">
+            <div className="editor-numeros" ref={numerosRef} aria-hidden="true">
+              {Array.from({ length: totalLineas }, (_, i) => (
+                <div key={i}>{i + 1}</div>
+              ))}
+            </div>
+            <textarea
+              className="editor-textarea"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              onScroll={sincronizarScroll}
+              onPaste={bloquearPegado}
+              onDrop={bloquearPegado}
+              spellCheck={false}
+              wrap="off"
+              aria-label="Editor de código"
+            />
+          </div>
           {avisoPegado && (
             <div className="aviso-pegado" role="status">
               Pegar código está desactivado en el editor: escríbelo tú para practicar.
