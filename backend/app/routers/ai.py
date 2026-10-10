@@ -33,6 +33,8 @@ Todo evento relevante (errores, rate limit activado, intentos sospechosos)
 queda registrado en logs/app.log para poder diagnosticar problemas después.
 """
 
+import re
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from typing import Optional
@@ -49,6 +51,18 @@ from app.logger import logger
 from app.utils import truncar_texto
 
 router = APIRouter()
+
+# Respaldo del formato: quita emojis si el modelo igual los incluye.
+_EMOJIS = re.compile(
+    "[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF"
+    "\U0001F900-\U0001F9FF\uFE0F\u200D]+"
+)
+
+
+def quitar_emojis(texto: str) -> str:
+    sin = _EMOJIS.sub("", texto)
+    # Limpia espacios dobles que quedan donde había un emoji.
+    return re.sub(r"[ \t]+(\n|$)", r"\1", re.sub(r"[ \t]{2,}", " ", sin)).strip()
 
 UMBRAL_OFRECER_RESPUESTA = 2  # intentos antes de ofrecer la respuesta directa
 
@@ -73,6 +87,19 @@ Estado de la ejecución (viene indicado en el mensaje):
 - Si el estudiante modificó el código después de la última ejecución,
   cualquier error anterior ya no aplica: revisa el código actual y pídele
   que lo vuelva a ejecutar para confirmar.
+"""
+
+FORMATO_RESPUESTA = """
+Formato de tu respuesta (obligatorio):
+- Breve: {limite}. Ve directo al punto.
+- Sin emojis, sin saludos ni frases de relleno como "¡Buena pregunta!".
+- No repitas el mensaje de error completo: el estudiante ya lo ve en la
+  consola, junto con una explicación simple. Si lo necesitas, cita solo la
+  parte clave.
+- Escribe en prosa simple: sin títulos, sin separadores y sin listas largas.
+- Puedes usar `código` en línea y **negrita** para destacar una línea o un
+  concepto. No uses bloques de código.
+- Usa español neutro y trata al estudiante de "tú".
 """
 
 BLINDAJE_INYECCION = """
@@ -102,7 +129,9 @@ Reglas:
   y adapta tu respuesta según ese tipo de error.
 - Si es útil, sugiere qué término buscar en la documentación oficial o en Google
   (por ejemplo: "prueba buscar: TypeError sum NoneType python"), sin inventar URLs.
-- Sé breve, claro y alentador.
+- Sé claro y alentador, y termina con una pregunta o una acción concreta.
+
+{FORMATO_RESPUESTA.format(limite="máximo 3 o 4 frases, unas 70 palabras")}
 
 {INSTRUCCION_ERROR_CONSOLA}
 
@@ -114,14 +143,14 @@ Eres un tutor de programación para estudiantes universitarios de distintas
 carreras que están aprendiendo Python y Java en la asignatura de Programación.
 
 El estudiante ya lleva varios intentos preguntando sobre el mismo ejercicio
-sin resolverlo. Responde con una pista igual que siempre (sin dar la solución),
-pero agrega al final, en un párrafo aparte, algo como:
+sin resolverlo. Responde con una pista igual que siempre: nunca entregues la
+solución ni el código corregido, y guía con una pregunta o una pista más
+concreta que la anterior.
 
-"Llevas un par de intentos con esto — ¿prefieres que te explique la solución
-directamente, o quieres seguir intentando por tu cuenta un poco más?"
+No le preguntes si quiere la explicación directa: la pantalla ya le muestra
+botones para elegir entre seguir intentando o pedir la explicación.
 
-No uses exactamente esas palabras, adáptalas de forma natural, pero mantén
-la idea: preguntar, no decidir por el estudiante.
+{FORMATO_RESPUESTA.format(limite="máximo 3 o 4 frases, unas 70 palabras")}
 
 {INSTRUCCION_ERROR_CONSOLA}
 
@@ -143,6 +172,8 @@ Reglas:
   ejemplo de sintaxis si es estrictamente necesario para explicar un concepto
   nuevo, pero no la solución del ejercicio completo.
 - Sé claro y directo, sin rodeos, ya que el estudiante pidió esta ayuda explícitamente.
+
+{FORMATO_RESPUESTA.format(limite="máximo un párrafo o dos cortos, unas 120 palabras")}
 
 {INSTRUCCION_ERROR_CONSOLA}
 
@@ -296,9 +327,9 @@ def consultar_tutor(consulta: ConsultaTutor):
             system=system_prompt,
             messages=[{"role": "user", "content": contenido}],
         )
-        respuesta_texto = "".join(
+        respuesta_texto = quitar_emojis("".join(
             bloque.text for bloque in mensaje.content if bloque.type == "text"
-        )
+        ))
 
     except anthropic.AuthenticationError:
         logger.error("Error de autenticación con la API de Anthropic (key inválida).")
