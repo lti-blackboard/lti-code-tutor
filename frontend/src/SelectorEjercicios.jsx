@@ -11,7 +11,7 @@ const NOMBRES_TEMA = {
   poo: 'Programación orientada a objetos',
 }
 
-export default function SelectorEjercicios({ onSeleccionar, onIrAPanelDocente }) {
+export default function SelectorEjercicios({ onSeleccionar }) {
   const [ejercicios, setEjercicios] = useState([])
   const [lenguaje, setLenguaje] = useState('python')
   const [cargando, setCargando] = useState(true)
@@ -45,13 +45,7 @@ export default function SelectorEjercicios({ onSeleccionar, onIrAPanelDocente })
   return (
     <div className="selector">
       <div className="selector-header">
-        <div className="brand">
-          code<span>tutor</span>
-        </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="enlace-panel-docente" onClick={onIrAPanelDocente}>
-            Panel del profesor
-          </button>
           <div className="lang-toggle">
             <button
               className={lenguaje === 'python' ? 'lang-btn activo' : 'lang-btn'}

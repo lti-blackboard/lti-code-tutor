@@ -1,13 +1,35 @@
+/* ---------- Identidad visual (rediseño) ----------
+ * Colores con significado: negro = seleccionado, naranja = acción,
+ * verde solo para "resuelto".
+ */
 :root {
-  --paper: #EEF1F6;
-  --panel: #FFFFFF;
-  --ink: #17203A;
-  --ink-soft: #5A6482;
-  --pencil-red: #C23B3B;
-  --amber: #E8A33D;
-  --rule: #D7DCE6;
-  --code-bg: #101526;
-  --code-text: #DCE3F0;
+  --ct-naranja: #E65C09;        /* naranja del logo: acentos y marca */
+  --ct-accion: #C94A05;         /* botones con texto blanco (contraste AA) */
+  --ct-accion-hover: #A83C02;
+  --ct-enlace: #B84506;
+  --ct-negro: #1D1D1B;
+  --ct-fondo: #F3F3F5;
+  --ct-blanco: #FFFFFF;
+  --ct-borde: #DADADF;
+  --ct-texto-suave: #55555A;
+  --ct-verde: #1E7A46;          /* solo para "resuelto" */
+  --ct-verde-fondo: #E4F3EA;
+  --ct-codigo-fondo: #1D1D1B;
+  --ct-codigo-texto: #F1F1F1;
+  --ct-fuente: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --ct-fuente-codigo: 'Roboto Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  /* Variables antiguas, apuntadas a la nueva paleta para que las pantallas
+     que aún no se rediseñan adopten la identidad. */
+  --paper: var(--ct-fondo);
+  --panel: var(--ct-blanco);
+  --ink: var(--ct-negro);
+  --ink-soft: var(--ct-texto-suave);
+  --pencil-red: var(--ct-accion);
+  --amber: var(--ct-naranja);
+  --rule: var(--ct-borde);
+  --code-bg: var(--ct-codigo-fondo);
+  --code-text: var(--ct-codigo-texto);
 }
 
 * { box-sizing: border-box; }
@@ -16,12 +38,132 @@ html, body, #root {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--ct-fondo);
+  color: var(--ct-negro);
+  font-family: var(--ct-fuente);
 }
 
 button { font-family: inherit; cursor: pointer; }
+a { color: var(--ct-enlace); }
+:focus-visible { outline: 3px solid var(--ct-naranja); outline-offset: 3px; }
+
+.ct-app { min-height: 100vh; display: flex; flex-direction: column; }
+.ct-contenido { flex: 1; }
+
+/* Encabezado común */
+.ct-franja { height: 8px; background: var(--ct-naranja); }
+.ct-encabezado { background: var(--ct-blanco); border-bottom: 1px solid var(--ct-borde); }
+.ct-encabezado-interior {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 32px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.ct-identidad { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.ct-logo-udla { height: 46px; width: auto; display: block; }
+.ct-divisor { width: 1px; height: 52px; background: var(--ct-negro); }
+.ct-marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  border-radius: 10px;
+  color: var(--ct-negro);
+  text-align: left;
+}
+.ct-marca-icono {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--ct-naranja);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ct-marca-texto { display: flex; flex-direction: column; gap: 2px; }
+.ct-marca-bajada {
+  font-size: 10.5px;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.ct-marca-nombre { font-size: 28px; line-height: 1; font-weight: 900; letter-spacing: -0.01em; }
+.ct-marca-acento { color: var(--ct-naranja); }
+.ct-encabezado-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+
+@media (max-width: 560px) {
+  .ct-encabezado-interior { padding: 14px 18px; gap: 14px; }
+  .ct-identidad { gap: 12px; flex-wrap: nowrap; }
+  .ct-logo-udla { height: 30px; }
+  .ct-divisor { height: 38px; }
+  .ct-marca { gap: 9px; }
+  .ct-marca-icono { width: 36px; height: 36px; }
+  .ct-marca-icono svg { width: 21px; height: 21px; }
+  .ct-marca-bajada { font-size: 8.5px; letter-spacing: 0.2em; }
+  .ct-marca-nombre { font-size: 22px; }
+}
+
+/* Botones */
+.ct-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.ct-btn-accion { background: var(--ct-accion); color: var(--ct-blanco); border: 2px solid var(--ct-accion); }
+.ct-btn-accion:hover { background: var(--ct-accion-hover); border-color: var(--ct-accion-hover); }
+.ct-btn-secundario { background: var(--ct-blanco); color: var(--ct-negro); border: 2px solid var(--ct-negro); }
+.ct-btn-secundario:hover { background: var(--ct-negro); color: var(--ct-blanco); }
+.ct-btn:disabled { opacity: .5; cursor: default; }
+
+/* Tarjetas estilo udla.cl: blancas con borde oscuro, naranjas al pasar el mouse */
+.ct-tarjeta {
+  background: var(--ct-blanco);
+  border: 2px solid var(--ct-negro);
+  border-radius: 14px;
+  color: var(--ct-negro);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+}
+.ct-tarjeta-clicable { cursor: pointer; text-align: left; font: inherit; }
+.ct-tarjeta-clicable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px -14px rgba(201, 74, 5, .55);
+  background: var(--ct-accion);
+  border-color: var(--ct-accion);
+  color: var(--ct-blanco);
+}
+.ct-tarjeta-seleccionada { background: var(--ct-negro); border-color: var(--ct-negro); color: var(--ct-blanco); }
+
+/* Insignia de resuelto (único uso del verde) */
+.ct-insignia-resuelto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ct-verde-fondo);
+  color: var(--ct-verde);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-tarjeta, .ct-btn { transition: none; }
+  .ct-tarjeta-clicable:hover { transform: none; }
+}
 
 /* ---------- Selector de ejercicios ---------- */
 
@@ -41,7 +183,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .brand {
-  font-family: 'Fraunces', serif;
+  font-family: var(--ct-fuente);
   font-size: 22px;
   font-weight: 600;
 }
@@ -67,7 +209,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .selector-titulo {
-  font-family: 'Fraunces', serif;
+  font-family: var(--ct-fuente);
   font-size: 26px;
   font-weight: 600;
   margin: 0 0 26px;
@@ -75,7 +217,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .tema-grupo { margin-bottom: 24px; }
 .tema-nombre {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -113,7 +255,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 500;
 }
 .nivel-tag {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10px;
   text-transform: uppercase;
   padding: 3px 7px;
@@ -133,7 +275,7 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0 20px;
 }
 .estado-error-detalle {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 12px;
   margin-top: 8px;
 }
@@ -166,7 +308,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .ejercicio-header { margin-bottom: 20px; }
 .eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -174,7 +316,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 4px;
 }
 .ejercicio-titulo {
-  font-family: 'Fraunces', serif;
+  font-family: var(--ct-fuente);
   font-size: 26px;
   font-weight: 600;
   margin: 0 0 8px;
@@ -187,7 +329,7 @@ button { font-family: inherit; cursor: pointer; }
   margin: 0 0 10px;
 }
 .intento-tracker {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 12px;
   color: var(--ink-soft);
 }
@@ -221,14 +363,14 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
 }
 .lang-pill {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #9AA6C4;
 }
 .run-btn {
-  font-family: 'IBM Plex Sans', sans-serif;
+  font-family: var(--ct-fuente);
   font-size: 11px;
   font-weight: 600;
   color: var(--code-bg);
@@ -254,7 +396,7 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 44px;
   padding: 16px 10px 16px 0;
   text-align: right;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 13px;
   line-height: 1.8;
   color: #5C6785;
@@ -271,7 +413,7 @@ button { font-family: inherit; cursor: pointer; }
   outline: none;
   resize: none;
   color: var(--code-text);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 13px;
   line-height: 1.8;
   padding: 16px 20px 16px 14px;
@@ -286,7 +428,7 @@ button { font-family: inherit; cursor: pointer; }
   overflow-y: auto;
 }
 .consola-titulo {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -294,7 +436,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 8px;
 }
 .consola-linea {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -305,7 +447,7 @@ button { font-family: inherit; cursor: pointer; }
 .consola-error { color: #F5A0A0; }
 .consola-vacio { color: #7D8AAE; font-style: italic; }
 .consola-estado {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10.5px;
   color: #7D8AAE;
   margin-top: 6px;
@@ -334,7 +476,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--pencil-red);
 }
 .nota-etiqueta {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -342,7 +484,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 4px;
 }
 .nota-texto {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-style: italic;
   font-size: 13px;
   line-height: 1.55;
@@ -401,7 +543,7 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0;
 }
 .error-consola-input {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 11.5px;
   border: 1px solid var(--rule);
   border-radius: 4px;
@@ -443,7 +585,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .pd-titulo {
-  font-family: 'Fraunces', serif;
+  font-family: var(--ct-fuente);
   font-size: 28px;
   font-weight: 600;
   margin: 0 0 4px;
@@ -471,7 +613,7 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: 0 1px 2px rgba(23,32,58,0.04), 0 8px 20px -12px rgba(23,32,58,0.15);
 }
 .kpi-numero {
-  font-family: 'Fraunces', serif;
+  font-family: var(--ct-fuente);
   font-size: 30px;
   font-weight: 600;
   line-height: 1;
@@ -483,7 +625,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .seccion-titulo {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -510,7 +652,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .alerta-texto b { font-weight: 600; }
 .alerta-badge {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10.5px;
   background: var(--pencil-red);
   color: white;
@@ -530,7 +672,7 @@ button { font-family: inherit; cursor: pointer; }
 .panel-docente thead th {
   text-align: left;
   padding: 12px 16px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -547,7 +689,7 @@ button { font-family: inherit; cursor: pointer; }
 .fill-media { background: var(--amber); }
 .fill-alta { background: var(--pencil-red); }
 .lenguaje-pill {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10px;
   background: var(--paper);
   border: 1px solid var(--rule);
@@ -614,7 +756,7 @@ button { font-family: inherit; cursor: pointer; }
   gap: 12px;
 }
 .modal-titulo {
-  font-family: 'Fraunces', serif;
+  font-family: var(--ct-fuente);
   font-size: 20px;
   font-weight: 600;
   margin: 2px 0 0;
@@ -644,7 +786,7 @@ button { font-family: inherit; cursor: pointer; }
   padding-left: 12px;
 }
 .modal-intento-numero {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -657,7 +799,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 3px;
 }
 .modal-intento-meta {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 10.5px;
   color: var(--ink-soft);
 }
@@ -781,7 +923,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .campo textarea { resize: vertical; }
 .campo textarea.codigo-base {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ct-fuente-codigo);
   font-size: 13px;
   background: var(--code-bg);
   color: var(--code-text);

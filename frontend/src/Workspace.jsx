@@ -128,7 +128,6 @@ export default function Workspace({ ejercicio, onVolver }) {
         <button className="volver-btn" onClick={onVolver}>
           ← Volver al catálogo
         </button>
-        <div className="curso-info">codetutor · Sesión activa</div>
       </div>
 
       <div className="ejercicio-header">

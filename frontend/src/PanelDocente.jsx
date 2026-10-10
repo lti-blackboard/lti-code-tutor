@@ -35,9 +35,7 @@ export default function PanelDocente({ onVolver }) {
   return (
     <div className="panel-docente">
       <div className="header">
-        <div className="brand">
-          code<span>tutor</span>
-        </div>
+        <div />
         <div className="pd-acciones">
           {token && (
             <button className="volver-btn" onClick={cerrarSesion}>
