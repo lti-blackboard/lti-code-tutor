@@ -13,7 +13,7 @@ export default function Encabezado({ onInicio, acciones = null }) {
       <header className="ct-encabezado">
         <div className="ct-encabezado-interior">
           <div className="ct-identidad">
-            <LogoUdla />
+            <LogoUdla onInicio={onInicio} />
             <button
               type="button"
               className="ct-marca"

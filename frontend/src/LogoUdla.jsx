@@ -7,11 +7,15 @@
 
 export const MOSTRAR_LOGO_UDLA = true
 
-export default function LogoUdla() {
+export default function LogoUdla({ onInicio }) {
   if (!MOSTRAR_LOGO_UDLA) return null
   return (
     <>
-      <img className="ct-logo-udla" src="/logo-udla.png" alt="Universidad de Las Américas" />
+      {/* Igual que la marca codetutor, el logo lleva al inicio. */}
+      <button type="button" className="ct-logo-boton" onClick={onInicio} title="Ir al inicio"
+        aria-label="Universidad de Las Américas, ir al inicio">
+        <img className="ct-logo-udla" src="/logo-udla.png" alt="" />
+      </button>
       <div className="ct-divisor" aria-hidden="true" />
     </>
   )

@@ -65,6 +65,7 @@ a { color: var(--ct-enlace); }
 }
 .ct-identidad { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
 .ct-logo-udla { height: 46px; width: auto; display: block; }
+.ct-logo-boton { background: none; border: none; padding: 4px; margin: -4px; border-radius: 8px; cursor: pointer; display: block; }
 .ct-divisor { width: 1px; height: 52px; background: var(--ct-negro); }
 .ct-marca {
   display: flex;
@@ -1310,7 +1311,7 @@ a { color: var(--ct-enlace); }
 .ct-tutor-vacio b { color: var(--ct-negro); }
 .ct-ejemplos { display: flex; flex-direction: column; gap: 8px; }
 .ct-ejemplos-titulo { font-size: 13.5px; font-weight: 700; color: var(--ct-negro); }
-.ct-ejemplos-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.ct-ejemplos-lista { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .ct-ejemplo {
   min-height: 40px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--ct-negro); background: var(--ct-blanco);
   color: var(--ct-negro); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
@@ -1385,3 +1386,30 @@ a { color: var(--ct-enlace); }
 .ct-aviso-consultas-limite { color: #8F3504; background: #FFF4EC; border-color: #F5CBAE; font-weight: 500; }
 .ct-oferta-acc:disabled { opacity: .5; cursor: default; }
 .ct-tutor-entrada input:disabled { background: var(--ct-fondo); color: #8A8A95; border-color: var(--ct-borde); }
+
+/* Estado resuelto */
+.ct-titulo-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.ct-insignia-titulo {
+  display: inline-flex; align-items: center; gap: 6px; background: #E3F1E8; color: #1F6B3A;
+  border: 1px solid #A9D3B6; border-radius: 999px; padding: 5px 12px; font-size: 14px; font-weight: 700;
+}
+.ct-resuelto {
+  display: flex; align-items: flex-start; gap: 12px; background: rgba(122,201,107,.14);
+  border: 1px solid rgba(122,201,107,.55); border-radius: 10px; padding: 14px 16px; color: #D6F2CC;
+}
+.ct-resuelto-icono {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; background: #5DB45A;
+  display: flex; align-items: center; justify-content: center;
+}
+.ct-resuelto-texto { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; line-height: 1.5; }
+.ct-resuelto-texto b { font-size: 17px; color: #FFFFFF; }
+.ct-comparacion { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.ct-comparacion-caja {
+  background: #16161A; border: 1px solid #2E2E36; border-radius: 8px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.ct-comparacion-titulo { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #A3A3AD; }
+.ct-comparacion-caja pre {
+  margin: 0; font-family: var(--ct-fuente-codigo); font-size: 15px; color: #E8E8EC; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.ct-comparacion-tuya pre { color: #B9D98B; }

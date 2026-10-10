@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { consultarTutor, ejecutarCodigo, obtenerConsultas } from './api.js'
+import { consultarTutor, ejecutarCodigo, obtenerConsultas, obtenerEstados } from './api.js'
 import Barras from './Barras.jsx'
 import { FlechaDerecha, FlechaIzquierda } from './Flecha.jsx'
 import Editor from './ejercicio/Editor.jsx'
@@ -12,7 +12,7 @@ import {
 const NOMBRE_ARCHIVO = { python: 'main.py', java: 'Main.java' }
 const VERSION = { python: 'Python 3', java: 'Java' }
 const ESTADO_EJECUCION = {
-  Accepted: 'Ejecutado sin errores',
+  Accepted: 'Ejecución correcta',
   'Compilation Error': 'Error de compilación',
   'Time Limit Exceeded': 'Tiempo excedido',
 }
@@ -93,6 +93,14 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
 
   useEffect(actualizarConsultas, [])
 
+  // ¿Ya estaba resuelto de antes? (para mostrar la insignia al entrar)
+  const [resueltoAntes, setResueltoAntes] = useState(false)
+  useEffect(() => {
+    obtenerEstados()
+      .then((d) => setResueltoAntes((d.estados || {})[ejercicio.id] === 'resuelto'))
+      .catch(() => {})
+  }, [ejercicio.id])
+
   // Mientras está bloqueado, se actualiza el tiempo restante y, al cumplirse,
   // se vuelve a consultar el contador.
   useEffect(() => {
@@ -126,6 +134,8 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
   const textoError = resultado ? resultado.error_compilacion || resultado.error || '' : ''
   const explicacion = resultado ? explicarResultado(resultado, lenguaje) : null
   const lineaError = ejecucionVigente && explicacion?.tipo === 'error' ? explicacion.linea : null
+  const resueltoAhora = Boolean(resultado?.resuelto)
+  const resuelto = resueltoAntes || resueltoAhora
 
   async function ejecutar() {
     setEjecutando(true)
@@ -231,7 +241,18 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
               <span>{etiquetaNivel(ejercicio.nivel)}</span>
             </span>
           </div>
-          <h1 className="ct-ejercicio-titulo">{ejercicio.titulo}</h1>
+          <div className="ct-titulo-fila">
+            <h1 className="ct-ejercicio-titulo">{ejercicio.titulo}</h1>
+            {resuelto && (
+              <span className="ct-insignia-titulo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Resuelto
+              </span>
+            )}
+          </div>
           <p className="ct-ejercicio-enunciado">{ejercicio.enunciado}</p>
         </div>
 
@@ -247,13 +268,13 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
                 </button>
               )}
               {siguiente ? (
-                <button type="button" className="ct-btn ct-btn-negro" title={`Siguiente: ${siguiente.titulo}`}
+                <button type="button" className={resuelto ? 'ct-btn ct-btn-accion' : 'ct-btn ct-btn-negro'} title={`Siguiente: ${siguiente.titulo}`}
                   onClick={() => onIr(siguiente)}>
                   Siguiente
                   <FlechaDerecha ancho={18} alto={12} />
                 </button>
               ) : (
-                <button type="button" className="ct-btn ct-btn-negro" title="Volver a la lista con tus filtros"
+                <button type="button" className={resuelto ? 'ct-btn ct-btn-accion' : 'ct-btn ct-btn-negro'} title="Volver a la lista con tus filtros"
                   onClick={onVolver}>
                   Elegir más ejercicios
                   <FlechaDerecha ancho={18} alto={12} />
@@ -321,7 +342,33 @@ export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, on
             {!ejecutando && !errorEjecucion && !resultado && (
               <p className="ct-consola-vacia">Ejecuta tu código para ver aquí el resultado.</p>
             )}
-            {!ejecutando && !errorEjecucion && resultado && (
+            {!ejecutando && !errorEjecucion && resultado && resueltoAhora && (
+              <>
+                <div className="ct-resuelto">
+                  <span className="ct-resuelto-icono">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0E0E11" strokeWidth="3.2"
+                      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </span>
+                  <span className="ct-resuelto-texto">
+                    <b>¡Resuelto! Tu programa entrega el resultado esperado.</b>
+                    <span>Este ejercicio quedará marcado como resuelto en tu lista.</span>
+                  </span>
+                </div>
+                <div className="ct-comparacion">
+                  <div className="ct-comparacion-caja ct-comparacion-tuya">
+                    <span className="ct-comparacion-titulo">Tu salida</span>
+                    <pre>{(resultado.salida || '').replace(/\s+$/, '')}</pre>
+                  </div>
+                  <div className="ct-comparacion-caja">
+                    <span className="ct-comparacion-titulo">Salida esperada</span>
+                    <pre>{resultado.salida_esperada}</pre>
+                  </div>
+                </div>
+              </>
+            )}
+            {!ejecutando && !errorEjecucion && resultado && !resueltoAhora && (
               <>
                 <div className={`ct-consola-mensaje ct-consola-mensaje-${['error', 'tiempo'].includes(explicacion.tipo) ? 'error' : explicacion.tipo === 'resuelto' ? 'resuelto' : 'info'}`}>
                   <span><b>{explicacion.titulo}</b> {explicacion.texto}</span>
