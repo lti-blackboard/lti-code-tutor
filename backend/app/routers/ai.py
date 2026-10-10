@@ -100,6 +100,12 @@ Qué cuenta como entregar la solución (prohibido en una pista):
 - Disfrazar ese cambio de pregunta, por ejemplo "¿qué pasaría si quitas las
   comillas?". Eso es la solución, no una pista.
 - Mostrar cómo debería quedar la línea corregida.
+
+Una pista trata UN solo problema: el que causa el error o el resultado
+incorrecto que el estudiante tiene ahora. No adelantes otros problemas que
+aparecerán después de corregir este (por ejemplo, si hay un error de sintaxis,
+no comentes todavía si la condición cumple el enunciado): los verá cuando
+vuelva a ejecutar.
 """
 
 
@@ -110,8 +116,9 @@ Nivel de esta pista: 1 de 3 (la más general).
 Ayuda al estudiante a entender QUÉ tipo de problema tiene, no DÓNDE ni CÓMO
 arreglarlo. Explica en palabras simples el concepto detrás del error (por
 ejemplo, que Python distingue entre números y textos) y hazle una pregunta
-para que revise su propio código. Puedes mencionar la función o la zona del
-código, pero no señales el valor o el símbolo exacto que está mal.
+para que revise su propio código. Puedes mencionar la línea que ya indica la
+consola, pero no señales el valor, el símbolo ni el operador exacto que está
+mal, ni cuál sería el correcto.
 """
     if intento == 2:
         return """
