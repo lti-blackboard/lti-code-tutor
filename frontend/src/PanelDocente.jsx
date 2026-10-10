@@ -164,8 +164,8 @@ export default function PanelDocente({ onVolver }) {
       </div>
 
       <p className="pd-nota-demo">
-        Nota: si estos datos provienen del script de prueba (generar_datos_demo.py), son datos
-        ficticios generados para esta demostración, no actividad real de estudiantes.
+        Nota: las sesiones cuyo nombre empieza con "demo-" son datos ficticios generados
+        para esta demostración, no actividad real de estudiantes.
       </p>
 
       {detalleAbierto && (

@@ -18,13 +18,13 @@ Prototipo funcional desplegado en línea (Avance 1).
 - Editor con ejecución real de código mediante Judge0, con bloqueo de pegado.
 - Tutor de IA con lógica pedagógica: solo pistas en la primera consulta; desde la segunda, el estudiante puede pedir una explicación directa, que explica el error sin entregar el código corregido completo.
 - Protecciones del tutor: instrucciones blindadas contra manipulación, validación de entradas, límite de 15 consultas cada 10 minutos por sesión y recorte de errores largos (máximo 20 líneas).
-- Panel docente: total de consultas, estudiantes activos, estudiantes atascados (3 o más consultas en un mismo ejercicio), porcentaje de explicaciones directas, resumen por ejercicio, alertas e historial por sesión.
+- Panel docente: consultas al tutor registradas, sesiones de estudiante, casos con 3 o más intentos en un mismo ejercicio, porcentaje que pidió explicación directa, mapa de dificultad por ejercicio, alertas e historial por sesión.
+- Base de datos permanente en PostgreSQL (Neon).
 
 **Pendiente:**
 
 - Integración LTI 1.3 real con Blackboard (los endpoints `/lti` son por ahora un esqueleto), incluida la devolución de notas.
 - Autenticación del panel docente (hoy no tiene; se resolverá con los roles que entrega LTI).
-- Migración de la base de datos de SQLite a PostgreSQL.
 - Traductor Python↔Java.
 - Pruebas automatizadas y piloto con estudiantes.
 
@@ -32,7 +32,7 @@ Prototipo funcional desplegado en línea (Avance 1).
 
 - **Backend:** Python con FastAPI.
 - **Frontend:** React con Vite, desplegado en Vercel.
-- **Base de datos:** SQLite (prototipo).
+- **Base de datos:** PostgreSQL en Neon cuando existe la variable `DATABASE_URL` (producción); SQLite local cuando no existe (desarrollo).
 - **Ejecución de código:** instancia pública de Judge0 CE (Python 3.8, OpenJDK 13).
 - **IA:** API de Claude (Anthropic), modelo configurable (por defecto `claude-sonnet-4-6`).
 - **Integración LTI:** LTI 1.3 (OIDC / JWT), planificada con la librería `pylti1p3`.
@@ -60,7 +60,7 @@ Crear un archivo `.env` (nunca subirlo a GitHub) con al menos:
 ANTHROPIC_API_KEY=tu_clave
 ```
 
-Variables opcionales: `MODELO_IA`, `RATE_LIMIT_MAX_CONSULTAS`, `RATE_LIMIT_VENTANA_MINUTOS`, `MAX_CARACTERES_CODIGO`, `MAX_CARACTERES_PREGUNTA`, `LTI_CLIENT_ID`, `LTI_ISSUER`.
+Variables opcionales: `DATABASE_URL` (PostgreSQL; sin ella se usa SQLite local), `MODELO_IA`, `RATE_LIMIT_MAX_CONSULTAS`, `RATE_LIMIT_VENTANA_MINUTOS`, `MAX_CARACTERES_CODIGO`, `MAX_CARACTERES_PREGUNTA`, `LTI_CLIENT_ID`, `LTI_ISSUER`.
 
 La documentación interactiva de la API queda en `http://127.0.0.1:8000/docs`.
 
@@ -75,11 +75,10 @@ Por defecto se conecta a `http://127.0.0.1:8000`. En producción, la variable `V
 
 **Datos de demostración para el panel docente:**
 
-```
-python generar_datos_demo.py
-```
+- En PostgreSQL (Neon): ejecutar `backend/datos_demo_panel.sql` en el SQL Editor. Se puede repetir: primero borra los datos demo anteriores.
+- En SQLite local: `python generar_datos_demo.py`.
 
-Estos datos son ficticios y deben declararse como tales en cualquier presentación.
+Las sesiones que empiezan con `demo-` son ficticias y deben declararse como tales en cualquier presentación.
 
 ## Equipo
 
