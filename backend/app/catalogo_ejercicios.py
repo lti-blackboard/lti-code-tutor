@@ -219,3 +219,44 @@ CATALOGO_EJERCICIOS = [
         "codigo_base": "class Animal {\n    String hacerSonido() {\n        return \"...\";\n    }\n}\n\nclass Perro {\n    String hacerSonido() {\n        return \"Guau\";\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Perro p = new Perro();\n        System.out.println(p.hacerSonido());\n    }\n}",
     },
 ]
+
+
+# Salida esperada de cada ejercicio base (lo que imprime una solución correcta).
+# Se usa para marcar un ejercicio como "Resuelto" sin usar IA: se compara la
+# salida del programa del estudiante con este texto (ignorando espacios al
+# final de cada línea y líneas vacías al final).
+# Se obtuvieron resolviendo cada ejercicio y ejecutándolo; el equipo debe
+# revisarlas, en especial las marcadas con "REVISAR".
+SALIDAS_ESPERADAS = {
+    'var-01-py': '1190.0',
+    'var-02-py': '2',
+    'cond-01-py': 'False',
+    'cond-02-py': 'Aprobado',
+    'ciclo-01-py': '15',
+    'ciclo-02-py': '5',
+    'func-01-py': '6.433333333333334',  # REVISAR: depende de cómo se resuelva el None (aquí se omite).
+    'func-02-py': 'Hola, invitado',
+    'lista-01-py': '-1',
+    'lista-02-py': '[1, 2, 3, 4]',
+    'rec-01-py': '120',
+    'rec-02-py': '8',
+    'poo-01-py': 'Roberto - Ingenieria en Informatica',
+    'poo-02-py': 'Guau',  # REVISAR: el código base ya imprime "Guau" sin heredar.
+    'var-01-java': '1190.0',
+    'var-02-java': '2',
+    'cond-01-java': 'false',
+    'cond-02-java': 'Aprobado',
+    'ciclo-01-java': '15',
+    'ciclo-02-java': '5',
+    'func-01-java': '0.0',  # REVISAR: depende de cómo se resuelva el arreglo vacío (aquí retorna 0).
+    'func-02-java': '9',
+    'lista-01-java': '-1',
+    'lista-02-java': '6',
+    'rec-01-java': '120',
+    'rec-02-java': '8',
+    'poo-01-java': 'Roberto - Ingenieria en Informatica',
+    'poo-02-java': 'Guau',  # REVISAR: el código base ya imprime "Guau" sin heredar.
+}
+
+for _ejercicio in CATALOGO_EJERCICIOS:
+    _ejercicio["salida_esperada"] = SALIDAS_ESPERADAS.get(_ejercicio["id"], "")

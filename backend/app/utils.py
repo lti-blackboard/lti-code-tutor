@@ -30,3 +30,22 @@ def truncar_texto(texto: str, max_lineas: int = MAX_LINEAS_ERROR) -> str:
     lineas_truncadas.append(f"... (+{lineas_omitidas} líneas repetidas, omitidas)")
 
     return "\n".join(lineas_truncadas)
+
+
+def normalizar_salida(texto) -> str:
+    """Quita espacios al final de cada línea y líneas vacías al final,
+    y unifica los saltos de línea (Windows/Linux)."""
+    if not texto:
+        return ""
+    lineas = str(texto).replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return "\n".join(linea.rstrip() for linea in lineas).rstrip("\n")
+
+
+def salida_coincide(salida, esperada) -> bool:
+    """True si la salida del programa es igual a la salida esperada
+    (después de normalizar). Una salida esperada vacía nunca coincide."""
+    esperada_normal = normalizar_salida(esperada)
+    if not esperada_normal:
+        return False
+    return normalizar_salida(salida) == esperada_normal
+

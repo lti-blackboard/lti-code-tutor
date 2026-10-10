@@ -158,6 +158,14 @@ class EjercicioDocente(BaseModel):
     lenguaje: str
     enunciado: str
     codigo_base: str = ""
+    salida_esperada: str = ""
+
+    @field_validator("salida_esperada")
+    @classmethod
+    def salida_larga(cls, valor: str) -> str:
+        if len(valor) > 2000:
+            raise ValueError("La salida esperada es demasiado larga (máximo 2.000 caracteres).")
+        return valor
 
     @field_validator("titulo", "enunciado")
     @classmethod

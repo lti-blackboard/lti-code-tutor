@@ -12,7 +12,9 @@ traducen automáticamente a "%s".
 
 Tablas:
 - intentos: historial de consultas al tutor de IA.
-- ejercicios: catálogo de ejercicios.
+- ejecuciones: cada ejecución de código (exitosa = sin errores;
+  resuelto = la salida coincidió con la salida esperada).
+- ejercicios: catálogo de ejercicios (incluye la salida esperada).
 
 Incluye también las consultas de agregación para el panel docente
 (resumen por ejercicio, alertas de estudiantes atascados, y el
@@ -117,6 +119,12 @@ def init_db():
     # Columna agregada después: marca los ejercicios creados por el docente.
     if not _existe_columna(conn, "ejercicios", "personalizado"):
         conn.execute("ALTER TABLE ejercicios ADD COLUMN personalizado INTEGER DEFAULT 0")
+    # Salida que debe imprimir una solución correcta (vacía = no se valida).
+    if not _existe_columna(conn, "ejercicios", "salida_esperada"):
+        conn.execute("ALTER TABLE ejercicios ADD COLUMN salida_esperada TEXT DEFAULT ''")
+    # Marca las ejecuciones cuya salida coincidió con la salida esperada.
+    if not _existe_columna(conn, "ejecuciones", "resuelto"):
+        conn.execute("ALTER TABLE ejecuciones ADD COLUMN resuelto INTEGER DEFAULT 0")
     conn.commit()
     conn.close()
 
@@ -169,13 +177,15 @@ def registrar_intento(
     conn.close()
 
 
-def registrar_ejecucion(sesion_id: str, ejercicio_id: str, exitosa: bool):
+def registrar_ejecucion(
+    sesion_id: str, ejercicio_id: str, exitosa: bool, resuelto: bool = False
+):
     """Registra cada ejecución de código: sirve para saber quién logró
-    ejecutar el ejercicio sin errores (y quién no)."""
+    ejecutar el ejercicio sin errores, y quién lo resolvió (salida correcta)."""
     conn = get_connection()
     conn.execute(
-        "INSERT INTO ejecuciones (sesion_id, ejercicio_id, exitosa) VALUES (?, ?, ?)",
-        (sesion_id, ejercicio_id, int(exitosa)),
+        "INSERT INTO ejecuciones (sesion_id, ejercicio_id, exitosa, resuelto) VALUES (?, ?, ?, ?)",
+        (sesion_id, ejercicio_id, int(exitosa), int(resuelto)),
     )
     conn.commit()
     conn.close()
@@ -187,6 +197,32 @@ def _pares_con_exito(conn):
         "SELECT DISTINCT sesion_id, ejercicio_id FROM ejecuciones WHERE exitosa = 1"
     ).fetchall()
     return {(f["sesion_id"], f["ejercicio_id"]) for f in filas}
+
+
+def estado_ejercicios_sesion(sesion_id: str) -> dict:
+    """
+    Estado de cada ejercicio trabajado por una sesión:
+    - "resuelto": alguna ejecución entregó la salida esperada.
+    - "en_progreso": tiene consultas al tutor o ejecuciones, pero no está resuelto.
+    Los ejercicios que no aparecen están "sin empezar".
+    """
+    conn = get_connection()
+    filas = conn.execute(
+        """
+        SELECT ejercicio_id, MAX(resuelto) AS resuelto FROM (
+            SELECT ejercicio_id, resuelto FROM ejecuciones WHERE sesion_id = ?
+            UNION ALL
+            SELECT ejercicio_id, 0 AS resuelto FROM intentos WHERE sesion_id = ?
+        ) t
+        GROUP BY ejercicio_id
+        """,
+        (sesion_id, sesion_id),
+    ).fetchall()
+    conn.close()
+    return {
+        f["ejercicio_id"]: "resuelto" if f["resuelto"] else "en_progreso"
+        for f in filas
+    }
 
 
 def listar_ejercicios(lenguaje: str = None, tema: str = None):
@@ -233,12 +269,14 @@ def crear_ejercicio_docente(datos: dict) -> dict:
     conn.execute(
         """
         INSERT INTO ejercicios
-            (id, tema, titulo, enunciado, lenguaje, nivel, codigo_base, orden, personalizado)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            (id, tema, titulo, enunciado, lenguaje, nivel, codigo_base, orden,
+             personalizado, salida_esperada)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """,
         (
             datos["id"], datos["tema"], datos["titulo"], datos["enunciado"],
             datos["lenguaje"], datos["nivel"], datos["codigo_base"], siguiente,
+            datos.get("salida_esperada", ""),
         ),
     )
     conn.commit()
@@ -252,12 +290,14 @@ def actualizar_ejercicio_docente(ejercicio_id: str, datos: dict):
     cursor = conn.execute(
         """
         UPDATE ejercicios
-        SET tema = ?, titulo = ?, enunciado = ?, lenguaje = ?, nivel = ?, codigo_base = ?
+        SET tema = ?, titulo = ?, enunciado = ?, lenguaje = ?, nivel = ?, codigo_base = ?,
+            salida_esperada = ?
         WHERE id = ? AND personalizado = 1
         """,
         (
             datos["tema"], datos["titulo"], datos["enunciado"], datos["lenguaje"],
-            datos["nivel"], datos["codigo_base"], ejercicio_id,
+            datos["nivel"], datos["codigo_base"], datos.get("salida_esperada", ""),
+            ejercicio_id,
         ),
     )
     actualizados = cursor.rowcount
@@ -281,9 +321,15 @@ def cargar_catalogo_inicial(ejercicios: list):
     # Inserta solo los ejercicios que todavía no existen (por id).
     sql = """
         INSERT INTO ejercicios
-            (id, tema, titulo, enunciado, lenguaje, nivel, codigo_base, orden)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, tema, titulo, enunciado, lenguaje, nivel, codigo_base, orden, salida_esperada)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO NOTHING
+    """
+    # Los ejercicios que ya existían antes de agregar la salida esperada la
+    # reciben ahora, solo si todavía no tienen una.
+    sql_salida = """
+        UPDATE ejercicios SET salida_esperada = ?
+        WHERE id = ? AND (salida_esperada IS NULL OR salida_esperada = '')
     """
     conn = get_connection()
     for ej in ejercicios:
@@ -292,8 +338,11 @@ def cargar_catalogo_inicial(ejercicios: list):
             (
                 ej["id"], ej["tema"], ej["titulo"], ej["enunciado"],
                 ej["lenguaje"], ej["nivel"], ej["codigo_base"], ej["orden"],
+                ej.get("salida_esperada", ""),
             ),
         )
+        if ej.get("salida_esperada"):
+            conn.execute(sql_salida, (ej["salida_esperada"], ej["id"]))
     conn.commit()
     conn.close()
 

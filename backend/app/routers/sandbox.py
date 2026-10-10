@@ -22,9 +22,9 @@ from typing import Optional
 import httpx
 
 from app.config import settings
-from app.db import registrar_ejecucion
+from app.db import obtener_ejercicio, registrar_ejecucion
 from app.logger import logger
-from app.utils import truncar_texto
+from app.utils import salida_coincide, truncar_texto
 
 router = APIRouter()
 
@@ -117,9 +117,23 @@ def ejecutar_codigo(consulta: ConsultaEjecucion):
         and not resultado.get("stderr")
         and not resultado.get("compile_output")
     )
+
+    # Validación sin IA: si el ejercicio tiene salida esperada, se compara
+    # con la salida real del programa (antes de recortarla).
+    salida_esperada = ""
+    if consulta.ejercicio_id:
+        try:
+            ejercicio = obtener_ejercicio(consulta.ejercicio_id)
+            salida_esperada = (ejercicio or {}).get("salida_esperada") or ""
+        except Exception as error:
+            logger.error(f"No se pudo leer la salida esperada: {repr(error)}")
+    resuelto = exitosa and salida_coincide(resultado.get("stdout"), salida_esperada)
+
     if consulta.sesion_id and consulta.ejercicio_id:
         try:
-            registrar_ejecucion(consulta.sesion_id, consulta.ejercicio_id, exitosa)
+            registrar_ejecucion(
+                consulta.sesion_id, consulta.ejercicio_id, exitosa, resuelto
+            )
         except Exception as error:
             # Registrar es secundario: nunca debe impedir mostrar el resultado.
             logger.error(f"No se pudo registrar la ejecución: {repr(error)}")
@@ -131,4 +145,9 @@ def ejecutar_codigo(consulta: ConsultaEjecucion):
         "estado": resultado.get("status", {}).get("description"),
         "tiempo_segundos": resultado.get("time"),
         "memoria_kb": resultado.get("memory"),
+        # validable: el ejercicio tiene salida esperada con la cual comparar.
+        "validable": bool(salida_esperada.strip()),
+        "resuelto": resuelto,
+        # La salida esperada solo se muestra cuando ya se resolvió.
+        "salida_esperada": salida_esperada if resuelto else None,
     }
