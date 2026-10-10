@@ -10,10 +10,15 @@ POST /docente/analisis-ia                     -> análisis de las preguntas con 
 Todas estas rutas exigen el token del docente (ver app/auth.py). Con la
 integración LTI, el acceso vendrá del rol que entrega Blackboard.
 
-GET    /docente/ejercicios        -> ejercicios creados por el docente
-POST   /docente/ejercicios        -> crear un ejercicio
-PUT    /docente/ejercicios/{id}   -> editar un ejercicio propio
-DELETE /docente/ejercicios/{id}   -> eliminar un ejercicio propio
+GET    /docente/ejercicios                 -> todos los ejercicios, con origen y si están ocultos
+POST   /docente/ejercicios                 -> crear un ejercicio
+PUT    /docente/ejercicios/{id}            -> editar cualquier ejercicio (base queda "modificado")
+POST   /docente/ejercicios/{id}/visibilidad -> ocultar o mostrar a los estudiantes
+POST   /docente/ejercicios/{id}/restaurar  -> volver un ejercicio base a su versión original
+DELETE /docente/ejercicios/{id}            -> eliminar (solo los creados por el docente)
+
+Origen de cada ejercicio: "base" (catálogo inicial), "modificado" (base
+editado por el docente) o "creado" (creado por el docente).
 """
 
 import time
@@ -34,7 +39,11 @@ from app.db import (
     crear_ejercicio_docente,
     actualizar_ejercicio_docente,
     eliminar_ejercicio_docente,
+    cambiar_visibilidad_ejercicio,
+    restaurar_ejercicio_base,
+    origen_ejercicio,
 )
+from app.catalogo_ejercicios import CATALOGO_EJERCICIOS
 from app.logger import logger
 from app.sugerencias import generar_sugerencias
 
@@ -219,19 +228,54 @@ def crear_ejercicio(datos: EjercicioDocente):
     sufijo = "py" if datos.lenguaje == "python" else "java"
     datos_dict = datos.model_dump()
     datos_dict["id"] = f"doc-{uuid.uuid4().hex[:8]}-{sufijo}"
-    return crear_ejercicio_docente(datos_dict)
+    return _con_origen(crear_ejercicio_docente(datos_dict))
+
+
+def _con_origen(ejercicio: dict) -> dict:
+    ejercicio["origen"] = origen_ejercicio(ejercicio)
+    ejercicio["oculto"] = int(ejercicio.get("oculto") or 0)
+    return ejercicio
 
 
 @router.put("/ejercicios/{ejercicio_id}")
 def editar_ejercicio(ejercicio_id: str, datos: EjercicioDocente):
     resultado = actualizar_ejercicio_docente(ejercicio_id, datos.model_dump())
     if not resultado:
-        raise HTTPException(status_code=404, detail="Solo se pueden editar ejercicios propios.")
-    return resultado
+        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
+    return _con_origen(resultado)
+
+
+class Visibilidad(BaseModel):
+    oculto: bool
+
+
+@router.post("/ejercicios/{ejercicio_id}/visibilidad")
+def visibilidad_ejercicio(ejercicio_id: str, datos: Visibilidad):
+    resultado = cambiar_visibilidad_ejercicio(ejercicio_id, datos.oculto)
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
+    return _con_origen(resultado)
+
+
+@router.post("/ejercicios/{ejercicio_id}/restaurar")
+def restaurar_ejercicio(ejercicio_id: str):
+    original = next((e for e in CATALOGO_EJERCICIOS if e["id"] == ejercicio_id), None)
+    if not original:
+        raise HTTPException(
+            status_code=400, detail="Solo se pueden restaurar ejercicios del catálogo base."
+        )
+    resultado = restaurar_ejercicio_base(ejercicio_id, original)
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
+    return _con_origen(resultado)
 
 
 @router.delete("/ejercicios/{ejercicio_id}")
 def borrar_ejercicio(ejercicio_id: str):
     if not eliminar_ejercicio_docente(ejercicio_id):
-        raise HTTPException(status_code=404, detail="Solo se pueden eliminar ejercicios propios.")
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se pueden eliminar ejercicios creados por el docente; "
+            "los del catálogo base se ocultan.",
+        )
     return {"eliminado": ejercicio_id}

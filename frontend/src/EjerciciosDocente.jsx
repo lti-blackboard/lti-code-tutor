@@ -38,7 +38,9 @@ export default function EjerciciosDocente({ onNoAutorizado }) {
 
   function cargar() {
     fetchDocente('/docente/ejercicios')
-      .then((datos) => setEjercicios(datos.ejercicios))
+      // Por ahora esta pestaña muestra solo los creados por el docente;
+      // la gestión de todos los ejercicios llega con el rediseño del panel.
+      .then((datos) => setEjercicios(datos.ejercicios.filter((e) => e.origen === 'creado')))
       .catch(manejarError)
   }
 

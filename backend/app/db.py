@@ -122,6 +122,12 @@ def init_db():
     # Salida que debe imprimir una solución correcta (vacía = no se valida).
     if not _existe_columna(conn, "ejercicios", "salida_esperada"):
         conn.execute("ALTER TABLE ejercicios ADD COLUMN salida_esperada TEXT DEFAULT ''")
+    # Ejercicios base editados por el docente (el original sigue en el catálogo).
+    if not _existe_columna(conn, "ejercicios", "modificado"):
+        conn.execute("ALTER TABLE ejercicios ADD COLUMN modificado INTEGER DEFAULT 0")
+    # Ejercicios ocultos para los estudiantes (los base no se borran).
+    if not _existe_columna(conn, "ejercicios", "oculto"):
+        conn.execute("ALTER TABLE ejercicios ADD COLUMN oculto INTEGER DEFAULT 0")
     # Marca las ejecuciones cuya salida coincidió con la salida esperada.
     if not _existe_columna(conn, "ejecuciones", "resuelto"):
         conn.execute("ALTER TABLE ejecuciones ADD COLUMN resuelto INTEGER DEFAULT 0")
@@ -225,9 +231,27 @@ def estado_ejercicios_sesion(sesion_id: str) -> dict:
     }
 
 
+def _pares_resueltos(conn):
+    """Conjunto de (sesion_id, ejercicio_id) con al menos una ejecución resuelta."""
+    filas = conn.execute(
+        "SELECT DISTINCT sesion_id, ejercicio_id FROM ejecuciones WHERE resuelto = 1"
+    ).fetchall()
+    return {(f["sesion_id"], f["ejercicio_id"]) for f in filas}
+
+
+def origen_ejercicio(ejercicio: dict) -> str:
+    """"creado" (por el docente), "modificado" (base editado) o "base"."""
+    if ejercicio.get("personalizado"):
+        return "creado"
+    if ejercicio.get("modificado"):
+        return "modificado"
+    return "base"
+
+
 def listar_ejercicios(lenguaje: str = None, tema: str = None):
+    """Ejercicios visibles para los estudiantes (sin los ocultos)."""
     conn = get_connection()
-    query = "SELECT * FROM ejercicios WHERE 1=1"
+    query = "SELECT * FROM ejercicios WHERE COALESCE(oculto, 0) = 0"
     params = []
     if lenguaje:
         query += " AND lenguaje = ?"
@@ -250,15 +274,23 @@ def obtener_ejercicio(ejercicio_id: str):
     return dict(fila) if fila else None
 
 
-# ---------- Ejercicios creados por el docente ----------
+# ---------- Gestión de ejercicios por el docente ----------
+# El docente puede editar todos los ejercicios. Los del catálogo base no se
+# borran: se ocultan, y si se editaron se pueden restaurar al original (que
+# sigue en catalogo_ejercicios.py). Los creados por el docente sí se eliminan.
 
 def listar_ejercicios_docente():
+    """Todos los ejercicios, incluidos los ocultos, con su origen."""
     conn = get_connection()
-    filas = conn.execute(
-        "SELECT * FROM ejercicios WHERE personalizado = 1 ORDER BY orden ASC"
-    ).fetchall()
+    filas = conn.execute("SELECT * FROM ejercicios ORDER BY orden ASC").fetchall()
     conn.close()
-    return [dict(f) for f in filas]
+    resultado = []
+    for f in filas:
+        ej = dict(f)
+        ej["origen"] = origen_ejercicio(ej)
+        ej["oculto"] = int(ej.get("oculto") or 0)
+        resultado.append(ej)
+    return resultado
 
 
 def crear_ejercicio_docente(datos: dict) -> dict:
@@ -285,14 +317,15 @@ def crear_ejercicio_docente(datos: dict) -> dict:
 
 
 def actualizar_ejercicio_docente(ejercicio_id: str, datos: dict):
-    """Solo modifica ejercicios creados por el docente (no el catálogo base)."""
+    """Edita cualquier ejercicio. Si es del catálogo base, queda como "modificado"."""
     conn = get_connection()
     cursor = conn.execute(
         """
         UPDATE ejercicios
         SET tema = ?, titulo = ?, enunciado = ?, lenguaje = ?, nivel = ?, codigo_base = ?,
-            salida_esperada = ?
-        WHERE id = ? AND personalizado = 1
+            salida_esperada = ?,
+            modificado = CASE WHEN personalizado = 1 THEN 0 ELSE 1 END
+        WHERE id = ?
         """,
         (
             datos["tema"], datos["titulo"], datos["enunciado"], datos["lenguaje"],
@@ -306,7 +339,41 @@ def actualizar_ejercicio_docente(ejercicio_id: str, datos: dict):
     return obtener_ejercicio(ejercicio_id) if actualizados else None
 
 
+def cambiar_visibilidad_ejercicio(ejercicio_id: str, oculto: bool):
+    conn = get_connection()
+    cursor = conn.execute(
+        "UPDATE ejercicios SET oculto = ? WHERE id = ?", (int(oculto), ejercicio_id)
+    )
+    actualizados = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return obtener_ejercicio(ejercicio_id) if actualizados else None
+
+
+def restaurar_ejercicio_base(ejercicio_id: str, original: dict):
+    """Vuelve un ejercicio base a su versión del catálogo (mantiene si está oculto)."""
+    conn = get_connection()
+    cursor = conn.execute(
+        """
+        UPDATE ejercicios
+        SET tema = ?, titulo = ?, enunciado = ?, lenguaje = ?, nivel = ?, codigo_base = ?,
+            salida_esperada = ?, modificado = 0
+        WHERE id = ? AND COALESCE(personalizado, 0) = 0
+        """,
+        (
+            original["tema"], original["titulo"], original["enunciado"],
+            original["lenguaje"], original["nivel"], original["codigo_base"],
+            original.get("salida_esperada", ""), ejercicio_id,
+        ),
+    )
+    actualizados = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return obtener_ejercicio(ejercicio_id) if actualizados else None
+
+
 def eliminar_ejercicio_docente(ejercicio_id: str) -> bool:
+    """Solo elimina ejercicios creados por el docente; los base se ocultan."""
     conn = get_connection()
     cursor = conn.execute(
         "DELETE FROM ejercicios WHERE id = ? AND personalizado = 1", (ejercicio_id,)
@@ -330,6 +397,7 @@ def cargar_catalogo_inicial(ejercicios: list):
     sql_salida = """
         UPDATE ejercicios SET salida_esperada = ?
         WHERE id = ? AND (salida_esperada IS NULL OR salida_esperada = '')
+          AND COALESCE(modificado, 0) = 0
     """
     conn = get_connection()
     for ej in ejercicios:
@@ -388,6 +456,7 @@ def obtener_kpis():
         """
     ).fetchone()["total"]
     con_exito = len(_pares_con_exito(conn))
+    resueltos = len(_pares_resueltos(conn))
 
     conn.close()
 
@@ -403,6 +472,9 @@ def obtener_kpis():
         "ejercicios_trabajados": trabajados,
         "ejercicios_sin_errores": con_exito,
         "porcentaje_sin_errores": round((con_exito / trabajados) * 100) if trabajados else 0,
+        "ejercicios_resueltos": resueltos,
+        # Tasa de resolución: ejercicios resueltos / ejercicios trabajados.
+        "tasa_resolucion": round((resueltos / trabajados) * 100) if trabajados else 0,
     }
 
 
@@ -424,6 +496,7 @@ def obtener_resumen_por_ejercicio():
         """
     ).fetchall()
     con_exito = _pares_con_exito(conn)
+    resueltos = _pares_resueltos(conn)
     conn.close()
 
     resultado = []
@@ -444,6 +517,9 @@ def obtener_resumen_por_ejercicio():
                 "promedio_intentos": promedio,
                 "sesiones_sin_errores": sum(
                     1 for (_, ej) in con_exito if ej == fila["ejercicio_id"]
+                ),
+                "sesiones_resueltas": sum(
+                    1 for (_, ej) in resueltos if ej == fila["ejercicio_id"]
                 ),
             }
         )
@@ -469,6 +545,7 @@ def obtener_alertas():
         (UMBRAL_ATASCADO,),
     ).fetchall()
     con_exito = _pares_con_exito(conn)
+    resueltos = _pares_resueltos(conn)
     conn.close()
 
     return [
@@ -479,6 +556,7 @@ def obtener_alertas():
             "lenguaje": fila["lenguaje"] or "-",
             "intentos": fila["intentos"],
             "ejecuto_sin_errores": (fila["sesion_id"], fila["ejercicio_id"]) in con_exito,
+            "resuelto": (fila["sesion_id"], fila["ejercicio_id"]) in resueltos,
         }
         for fila in filas
     ]

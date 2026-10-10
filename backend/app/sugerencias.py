@@ -51,15 +51,15 @@ def generar_sugerencias(kpis: dict, ejercicios: list, alertas: list) -> list:
             }
         )
 
-    # 3. Casos con 3+ intentos que todavía no logran ejecutar sin errores -> contactar.
-    sin_resolver = [a for a in alertas if not a.get("ejecuto_sin_errores")]
+    # 3. Casos con 3+ intentos que todavía no resuelven el ejercicio -> contactar.
+    sin_resolver = [a for a in alertas if not a.get("resuelto")]
     if sin_resolver:
         n = len(sin_resolver)
         sugerencias.append(
             {
                 "tipo": "contactar",
                 "texto": f"{n} {'caso' if n == 1 else 'casos'} con 3 o más intentos "
-                f"{'todavía no logra' if n == 1 else 'todavía no logran'} ejecutar el ejercicio sin errores. "
+                f"{'todavía no resuelve' if n == 1 else 'todavía no resuelven'} el ejercicio. "
                 "Considere contactarlos o derivarlos a ayudantía; use Revisar para ver qué preguntaron.",
             }
         )

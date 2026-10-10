@@ -21,6 +21,9 @@ def _para_estudiante(ejercicio: dict) -> dict:
     datos = dict(ejercicio)
     salida = datos.pop("salida_esperada", "") or ""
     datos["validable"] = bool(salida.strip())
+    # Datos de gestión interna que el estudiante no necesita.
+    for campo in ("oculto", "modificado"):
+        datos.pop(campo, None)
     return datos
 
 
@@ -44,6 +47,6 @@ def obtener_estado_ejercicios(
 @router.get("/{ejercicio_id}")
 def obtener_detalle_ejercicio(ejercicio_id: str):
     ejercicio = obtener_ejercicio(ejercicio_id)
-    if not ejercicio:
+    if not ejercicio or ejercicio.get("oculto"):
         raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
     return _para_estudiante(ejercicio)
