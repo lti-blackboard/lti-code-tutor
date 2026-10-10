@@ -88,8 +88,7 @@ export default function PasoLenguaje({ ejercicios, cargando, onElegir }) {
           ¿Con qué lenguaje quieres <b>practicar hoy?</b>
         </h1>
         <p className="ct-bajada">
-          Todos los ejercicios están abiertos: elige el lenguaje y después el nivel y tema que
-          necesites.
+          Elige el lenguaje y después el nivel y el tema que necesites.
         </p>
       </div>
 

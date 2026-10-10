@@ -987,7 +987,7 @@ a { color: var(--ct-enlace); }
 .ct-entrada { animation: ct-entrar .4s ease both; }
 @keyframes ct-entrar { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-.ct-intro { display: flex; flex-direction: column; gap: 12px; max-width: 760px; }
+.ct-intro { display: flex; flex-direction: column; gap: 12px; max-width: 980px; }
 .ct-paso-etiqueta {
   display: flex; align-items: center; gap: 12px;
   font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ct-enlace);
