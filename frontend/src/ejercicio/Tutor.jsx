@@ -11,6 +11,9 @@ function IconoAmpolleta({ color = 'currentColor', tam = 20 }) {
   )
 }
 
+// Preguntas de ejemplo del tutor vacío: al tocarlas se envían tal cual.
+const EJEMPLOS = ['¿Por qué falla mi código?', '¿Qué significa este error?', '¿Voy bien?']
+
 /*
  * Panel del tutor en formato conversación.
  * mensajes: [{ rol: 'estudiante' | 'pista' | 'explicacion', texto }]
@@ -49,10 +52,24 @@ export default function Tutor({
 
       <div className="ct-tutor-mensajes" aria-live="polite">
         {mensajes.length === 0 && !cargando && (
-          <p className="ct-tutor-vacio">
-            Ejecuta tu código y pregúntame cuando tengas una duda o un error. Te daré pistas para
-            que llegues tú a la solución.
-          </p>
+          <div className="ct-tutor-vacio">
+            <p>
+              <b>Hola, soy tu tutor.</b> Te ayudo con pistas para que llegues tú a la solución.
+              Desde tu segunda pregunta puedes pedirme que te explique el concepto, pero nunca te
+              daré el código corregido.
+            </p>
+            <div className="ct-ejemplos">
+              <span className="ct-ejemplos-titulo">Prueba con:</span>
+              <div className="ct-ejemplos-lista">
+                {EJEMPLOS.map((ej) => (
+                  <button key={ej} type="button" className="ct-ejemplo" disabled={bloqueado}
+                    onClick={() => onPreguntar(ej)}>
+                    {ej}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
         {mensajes.map((m, i) => {
           if (m.rol === 'estudiante') {

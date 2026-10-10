@@ -1305,7 +1305,19 @@ a { color: var(--ct-enlace); }
 .ct-tutor-bajada { font-size: 12.5px; color: #55555C; }
 .ct-tutor-contador { font-size: 12.5px; color: #45454B; background: var(--ct-fondo); border-radius: 999px; padding: 4px 10px; }
 .ct-tutor-mensajes { flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; min-height: 240px; }
-.ct-tutor-vacio { margin: 0; font-size: 15px; line-height: 1.55; color: #45454B; }
+.ct-tutor-vacio { display: flex; flex-direction: column; gap: 14px; font-size: 15px; line-height: 1.55; color: #45454B; }
+.ct-tutor-vacio p { margin: 0; }
+.ct-tutor-vacio b { color: var(--ct-negro); }
+.ct-ejemplos { display: flex; flex-direction: column; gap: 8px; }
+.ct-ejemplos-titulo { font-size: 13.5px; font-weight: 700; color: var(--ct-negro); }
+.ct-ejemplos-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.ct-ejemplo {
+  min-height: 40px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--ct-negro); background: var(--ct-blanco);
+  color: var(--ct-negro); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.ct-ejemplo:hover { background: var(--ct-accion); border-color: var(--ct-accion); color: var(--ct-blanco); }
+.ct-ejemplo:disabled { opacity: .5; cursor: default; }
 .ct-msj-estudiante {
   align-self: flex-end; max-width: 85%; background: var(--ct-negro); color: var(--ct-blanco);
   border-radius: 14px 14px 4px 14px; padding: 10px 14px; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere;
