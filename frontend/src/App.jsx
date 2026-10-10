@@ -59,7 +59,23 @@ export default function App() {
   let contenido
   if (vista === 'workspace' && ejercicioSeleccionado) {
     contenido = (
-      <Workspace ejercicio={ejercicioSeleccionado} onVolver={() => setVista('ejercicios')} />
+      <Workspace
+        key={ejercicioSeleccionado.id}
+        ejercicio={ejercicioSeleccionado}
+        ejercicios={ejercicios}
+        filtros={filtros}
+        onVolver={() => setVista('ejercicios')}
+        onIr={(ej) => {
+          setEjercicioSeleccionado(ej)
+          window.scrollTo(0, 0)
+        }}
+        onSugerencia={(s) => {
+          if (s.lenguaje) setLenguaje(s.lenguaje)
+          setFiltros(s.filtros)
+          setVista('ejercicios')
+          window.scrollTo(0, 0)
+        }}
+      />
     )
   } else if (vista === 'docente') {
     contenido = <PanelDocente onVolver={irAlInicio} />

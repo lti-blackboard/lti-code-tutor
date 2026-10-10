@@ -197,6 +197,18 @@ class ConsultaTutor(BaseModel):
         return valor_normalizado
 
 
+@router.get("/consultas")
+def consultas_disponibles(sesion_id: str):
+    """Consultas al tutor usadas por la sesión en la ventana de tiempo actual."""
+    return {
+        "consultas_usadas": contar_consultas_recientes(
+            sesion_id, settings.rate_limit_ventana_minutos
+        ),
+        "consultas_maximas": settings.rate_limit_max_consultas,
+        "ventana_minutos": settings.rate_limit_ventana_minutos,
+    }
+
+
 @router.post("/tutor")
 def consultar_tutor(consulta: ConsultaTutor):
     # --- Rate limiting ---
@@ -333,6 +345,10 @@ def consultar_tutor(consulta: ConsultaTutor):
     return {
         "respuesta": respuesta_texto,
         "intento_numero": intento_actual,
+        # Para el contador de consultas que ve el estudiante.
+        "consultas_usadas": consultas_recientes + 1,
+        "consultas_maximas": settings.rate_limit_max_consultas,
+        "ventana_minutos": settings.rate_limit_ventana_minutos,
         "se_ofrecio_respuesta_directa": intento_actual >= UMBRAL_OFRECER_RESPUESTA
         and not consulta.quiere_respuesta_directa
         and not codigo_funciona,

@@ -77,6 +77,14 @@ export async function consultarTutor({
   return manejarRespuesta(respuesta)
 }
 
+// Consultas al tutor usadas en la ventana de tiempo (para el contador).
+export async function obtenerConsultas() {
+  const params = new URLSearchParams({ sesion_id: obtenerSesionId() })
+  const respuesta = await fetch(`${API_BASE}/ai/consultas?${params}`)
+  if (!respuesta.ok) throw new Error('No se pudo cargar el contador de consultas.')
+  return respuesta.json()
+}
+
 export async function ejecutarCodigo({ codigo, lenguaje, entrada, ejercicioId }) {
   const respuesta = await fetch(`${API_BASE}/sandbox/ejecutar`, {
     method: 'POST',

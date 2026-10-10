@@ -1,298 +1,307 @@
-import { useRef, useState } from 'react'
-import { consultarTutor, ejecutarCodigo } from './api.js'
+import { useEffect, useState } from 'react'
+import { consultarTutor, ejecutarCodigo, obtenerConsultas } from './api.js'
+import Barras from './Barras.jsx'
+import { FlechaDerecha, FlechaIzquierda } from './Flecha.jsx'
+import Editor from './ejercicio/Editor.jsx'
+import Tutor, { IconoAmpolleta } from './ejercicio/Tutor.jsx'
+import { explicarResultado } from './ejercicio/mensajesError.js'
+import {
+  NIVELES, NOMBRE_LENGUAJE, TEMAS, etiquetaNivel, filtrarEjercicios, nombreCortoTema, nombreTema,
+} from './catalogo.js'
 
-export default function Workspace({ ejercicio, onVolver }) {
-  const [codigo, setCodigo] = useState(ejercicio.codigo_base)
-  const [pregunta, setPregunta] = useState('')
-  const [errorConsola, setErrorConsola] = useState('')
-  const [mostrarErrorConsola, setMostrarErrorConsola] = useState(false)
-  const [notas, setNotas] = useState([])
-  const [cargando, setCargando] = useState(false)
-  const [mensajeSistema, setMensajeSistema] = useState(null)
+const NOMBRE_ARCHIVO = { python: 'main.py', java: 'Main.java' }
+const VERSION = { python: 'Python 3', java: 'Java' }
+const ESTADO_EJECUCION = {
+  Accepted: 'Ejecutado sin errores',
+  'Compilation Error': 'Error de compilación',
+  'Time Limit Exceeded': 'Tiempo excedido',
+}
+
+// El borrador del código se guarda en este navegador, para que "Continuar"
+// retome el ejercicio donde quedó.
+const claveBorrador = (id) => `borrador:${id}`
+function leerBorrador(ejercicio) {
+  try {
+    return localStorage.getItem(claveBorrador(ejercicio.id)) ?? ejercicio.codigo_base
+  } catch {
+    return ejercicio.codigo_base
+  }
+}
+
+/** Siguiente grupo sugerido cuando se llega al último ejercicio de la lista. */
+function calcularSugerencia(ejercicios, lenguaje, { nivel, tema }) {
+  const hay = (f) => filtrarEjercicios(ejercicios, { lenguaje, ...f }).length > 0
+  if (tema) {
+    const i = TEMAS.findIndex((t) => t[0] === tema)
+    const siguiente = TEMAS.slice(i + 1).find(([clave]) => hay({ nivel, tema: clave }))
+    if (siguiente) {
+      return {
+        filtros: { nivel, tema: siguiente[0] },
+        texto: <>¿Seguimos con <b>{siguiente[2]}</b>{nivel ? ` en nivel ${etiquetaNivel(nivel)}` : ''}?</>,
+      }
+    }
+  }
+  if (nivel) {
+    const i = NIVELES.findIndex((n) => n[0] === nivel)
+    const siguiente = NIVELES.slice(i + 1).find(([clave]) => hay({ nivel: clave }))
+    if (siguiente) {
+      return { filtros: { nivel: siguiente[0], tema: null }, texto: <>¿Seguimos con el nivel <b>{siguiente[1]}</b>?</> }
+    }
+  }
+  const otro = lenguaje === 'python' ? 'java' : 'python'
+  if (filtrarEjercicios(ejercicios, { lenguaje: otro }).length) {
+    return {
+      lenguaje: otro,
+      filtros: { nivel: null, tema: null },
+      texto: <>¿Practicamos en <b>{NOMBRE_LENGUAJE[otro]}</b>?</>,
+    }
+  }
+  return null
+}
+
+export default function Workspace({ ejercicio, ejercicios, filtros, onVolver, onIr, onSugerencia }) {
+  const lenguaje = ejercicio.lenguaje
+  const [codigo, setCodigo] = useState(() => leerBorrador(ejercicio))
   const [avisoPegado, setAvisoPegado] = useState(false)
 
+  // Consola: resultado real del sandbox y el código que lo produjo.
+  const [resultado, setResultado] = useState(null)
+  const [codigoEjecutado, setCodigoEjecutado] = useState(null)
+  const [ejecutando, setEjecutando] = useState(false)
+  const [errorEjecucion, setErrorEjecucion] = useState(null)
+
+  // Tutor
+  const [mensajes, setMensajes] = useState([])
+  const [cargandoTutor, setCargandoTutor] = useState(false)
+  const [errorTutor, setErrorTutor] = useState(null)
+  const [ofrecerDecision, setOfrecerDecision] = useState(false)
+  const [consultas, setConsultas] = useState(null)
+
+  useEffect(() => {
+    obtenerConsultas().then(setConsultas).catch(() => setConsultas(null))
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(claveBorrador(ejercicio.id), codigo)
+    } catch {
+      /* sin almacenamiento disponible: no se guarda el borrador */
+    }
+  }, [codigo, ejercicio.id])
+
   // Bloqueo de pegado en el editor: el estudiante debe escribir el código
-  // para practicar. Cubre Ctrl+V, "Pegar" del menú y arrastrar texto.
-  // No es infalible (se puede saltar con las herramientas del navegador);
-  // el objetivo es que copiar no sea el camino fácil.
-  // La caja del error de consola NO lleva este bloqueo: está hecha para pegar.
+  // para practicar. No es infalible; el objetivo es que copiar no sea el
+  // camino fácil.
   function bloquearPegado(e) {
     e.preventDefault()
     setAvisoPegado(true)
     setTimeout(() => setAvisoPegado(false), 3000)
   }
-  const [ofrecerDecision, setOfrecerDecision] = useState(false)
-  const [intentoActual, setIntentoActual] = useState(0)
 
-  // Estado de la consola de ejecución (resultado real del sandbox).
-  const [consola, setConsola] = useState(null)
-  const [ejecutando, setEjecutando] = useState(false)
+  const ejecucionVigente = resultado !== null && codigoEjecutado === codigo
+  const textoError = resultado ? resultado.error_compilacion || resultado.error || '' : ''
+  const explicacion = resultado ? explicarResultado(resultado, lenguaje) : null
+  const lineaError = ejecucionVigente && explicacion?.tipo === 'error' ? explicacion.linea : null
 
-  // Resultado de la última ejecución, junto con el código que la produjo.
-  // Sirve para que el tutor sepa si el código actual ya funcionó, si sigue
-  // con error o si fue modificado después de ejecutarlo.
-  const [ultimaEjecucion, setUltimaEjecucion] = useState(null)
-  // true si el texto de "error de consola" lo puso el sistema al ejecutar
-  // (y no el estudiante a mano): ese error se descarta cuando ya no aplica.
-  const [errorAutomatico, setErrorAutomatico] = useState(false)
-
-  // Números de línea del editor: la columna se desplaza junto con el texto.
-  const numerosRef = useRef(null)
-  const totalLineas = codigo.split('\n').length
-  function sincronizarScroll(e) {
-    if (numerosRef.current) numerosRef.current.scrollTop = e.target.scrollTop
-  }
-
-  const ejecucionVigente = ultimaEjecucion !== null && ultimaEjecucion.codigo === codigo
-
-  async function manejarEjecutar() {
+  async function ejecutar() {
     setEjecutando(true)
-    setConsola(null)
+    setErrorEjecucion(null)
+    const codigoActual = codigo
     try {
-      const resultado = await ejecutarCodigo({
-        codigo,
-        lenguaje: ejercicio.lenguaje,
-        ejercicioId: ejercicio.id,
-      })
-      setConsola(resultado)
-
-      // Si el código falló (error de ejecución o de compilación), ofrecemos
-      // pasar ese error directo al campo de "error de consola" para el tutor,
-      // así el estudiante no tiene que copiarlo y pegarlo a mano.
-      const textoError = resultado.error_compilacion || resultado.error || null
-      setUltimaEjecucion({ codigo, error: textoError, salida: resultado.salida || '' })
-      if (textoError) {
-        setErrorConsola(textoError)
-        setMostrarErrorConsola(true)
-        setErrorAutomatico(true)
-      } else if (errorAutomatico) {
-        // El código ya corre sin errores: el error anterior dejó de aplicar.
-        setErrorConsola('')
-        setMostrarErrorConsola(false)
-        setErrorAutomatico(false)
-      }
+      const r = await ejecutarCodigo({ codigo: codigoActual, lenguaje, ejercicioId: ejercicio.id })
+      setResultado(r)
+      setCodigoEjecutado(codigoActual)
     } catch (err) {
-      setConsola({ fallo: true, mensaje: err.message })
+      setErrorEjecucion(err.message)
     } finally {
       setEjecutando(false)
     }
   }
 
-  async function enviarPregunta(quiereRespuestaDirecta = false) {
-    if (!quiereRespuestaDirecta && !pregunta.trim()) return
+  function reiniciar() {
+    if (codigo !== ejercicio.codigo_base &&
+      !window.confirm('¿Volver al código original del ejercicio? Se perderán tus cambios.')) return
+    setCodigo(ejercicio.codigo_base)
+    setResultado(null)
+    setCodigoEjecutado(null)
+  }
 
-    setCargando(true)
-    setMensajeSistema(null)
+  async function preguntar(texto, quiereRespuestaDirecta = false) {
+    setCargandoTutor(true)
+    setErrorTutor(null)
     setOfrecerDecision(false)
-
+    setMensajes((m) => [...m, { rol: 'estudiante', texto: quiereRespuestaDirecta ? 'Explícamelo' : texto }])
     try {
-      const resultado = await consultarTutor({
+      const r = await consultarTutor({
         codigo,
-        pregunta: quiereRespuestaDirecta ? 'El estudiante pidió la explicación directa.' : pregunta,
-        lenguaje: ejercicio.lenguaje,
+        pregunta: quiereRespuestaDirecta ? 'El estudiante pidió la explicación directa.' : texto,
+        lenguaje,
         ejercicioId: ejercicio.id,
-        // Un error automático solo se envía si corresponde al código actual.
-        errorConsola: errorAutomatico && !ejecucionVigente ? undefined : errorConsola.trim() || undefined,
-        estadoEjecucion: !ultimaEjecucion
-          ? 'sin_ejecutar'
-          : !ejecucionVigente
-            ? 'modificado'
-            : ultimaEjecucion.error
-              ? 'con_error'
-              : 'ok',
-        salidaConsola: ejecucionVigente && !ultimaEjecucion.error ? ultimaEjecucion.salida : undefined,
+        // El error se adjunta solo si corresponde al código actual.
+        errorConsola: ejecucionVigente && textoError ? textoError : undefined,
+        estadoEjecucion: !resultado ? 'sin_ejecutar' : !ejecucionVigente ? 'modificado' : textoError ? 'con_error' : 'ok',
+        salidaConsola: ejecucionVigente && !textoError ? resultado.salida || '' : undefined,
         quiereRespuestaDirecta,
       })
-
-      setNotas((anteriores) => [
-        ...anteriores,
-        {
-          tipo: quiereRespuestaDirecta ? 'explicacion' : 'pista',
-          texto: resultado.respuesta,
-          intento: resultado.intento_numero,
-        },
-      ])
-      setIntentoActual(resultado.intento_numero)
-      setOfrecerDecision(resultado.se_ofrecio_respuesta_directa)
-      setPregunta('')
+      setMensajes((m) => [...m, { rol: quiereRespuestaDirecta ? 'explicacion' : 'pista', texto: r.respuesta }])
+      setOfrecerDecision(r.se_ofrecio_respuesta_directa)
+      if (r.consultas_maximas) setConsultas(r)
     } catch (err) {
-      setMensajeSistema(err.message)
+      setErrorTutor(err.message)
     } finally {
-      setCargando(false)
+      setCargandoTutor(false)
     }
   }
 
-  return (
-    <div className="workspace-page">
-      <div className="topbar">
-        <button className="volver-btn" onClick={onVolver}>
-          ← Volver al catálogo
-        </button>
-      </div>
+  let adjunto = 'Se enviará tu código'
+  if (ejecucionVigente && textoError) {
+    adjunto = lineaError ? `Se enviará tu código y el error de la línea ${lineaError}` : 'Se enviará tu código y el error de la consola'
+  } else if (ejecucionVigente) {
+    adjunto = 'Se enviará tu código y su salida'
+  } else if (resultado) {
+    adjunto = 'Se enviará tu código (cambió desde la última ejecución)'
+  }
 
-      <div className="ejercicio-header">
-        <div className="eyebrow">
-          {ejercicio.tema} · {ejercicio.lenguaje === 'python' ? 'Python' : 'Java'}
-        </div>
-        <h1 className="ejercicio-titulo">{ejercicio.titulo}</h1>
-        <p className="ejercicio-enunciado">{ejercicio.enunciado}</p>
-        {intentoActual > 0 && (
-          <div className="intento-tracker">
-            <span>Intento {intentoActual} de esta sesión</span>
+  // Navegación según los filtros del Paso 2.
+  const lista = filtrarEjercicios(ejercicios, { lenguaje, ...filtros })
+  const indice = lista.findIndex((e) => e.id === ejercicio.id)
+  const anterior = indice > 0 ? lista[indice - 1] : null
+  const siguiente = indice >= 0 && indice < lista.length - 1 ? lista[indice + 1] : null
+  const grupo = [filtros.tema && nombreCortoTema(filtros.tema), filtros.nivel && etiquetaNivel(filtros.nivel)]
+    .filter(Boolean).join(' · ') || 'Todos los ejercicios'
+  const esUltimo = indice >= 0 && !siguiente
+  const sugerencia = esUltimo ? calcularSugerencia(ejercicios, lenguaje, filtros) : null
+
+  return (
+    <div className="ct-ejercicio-pagina">
+      <div className="ct-ejercicio-cabecera">
+        <div className="ct-ejercicio-info">
+          <div className="ct-ejercicio-migas">
+            <button type="button" className="ct-btn ct-btn-secundario ct-volver" onClick={onVolver}>
+              <FlechaIzquierda />
+              Volver a ejercicios
+            </button>
+            <span className="ct-migas-texto">
+              {NOMBRE_LENGUAJE[lenguaje]} <span aria-hidden="true">›</span> {nombreTema(ejercicio.tema)}
+            </span>
+            <span className="ct-migas-nivel">
+              <Barras nivel={ejercicio.nivel} />
+              <span>{etiquetaNivel(ejercicio.nivel)}</span>
+            </span>
           </div>
+          <h1 className="ct-ejercicio-titulo">{ejercicio.titulo}</h1>
+          <p className="ct-ejercicio-enunciado">{ejercicio.enunciado}</p>
+        </div>
+
+        {indice >= 0 && (
+          <nav aria-label="Navegación entre ejercicios" className="ct-navegacion">
+            <span className="ct-nav-posicion">Ejercicio {indice + 1} de {lista.length} · {grupo}</span>
+            <div className="ct-nav-botones">
+              {anterior && (
+                <button type="button" className="ct-btn ct-btn-secundario" title={`Anterior: ${anterior.titulo}`}
+                  onClick={() => onIr(anterior)}>
+                  <FlechaIzquierda ancho={18} alto={12} />
+                  Anterior
+                </button>
+              )}
+              {siguiente ? (
+                <button type="button" className="ct-btn ct-btn-negro" title={`Siguiente: ${siguiente.titulo}`}
+                  onClick={() => onIr(siguiente)}>
+                  Siguiente
+                  <FlechaDerecha ancho={18} alto={12} />
+                </button>
+              ) : (
+                <button type="button" className="ct-btn ct-btn-negro" title="Volver a la lista con tus filtros"
+                  onClick={onVolver}>
+                  Elegir más ejercicios
+                  <FlechaDerecha ancho={18} alto={12} />
+                </button>
+              )}
+            </div>
+            {esUltimo && <span className="ct-nav-nota">Es el último de {grupo === 'Todos los ejercicios' ? 'la lista' : grupo}</span>}
+            {sugerencia && (
+              <button type="button" className="ct-sugerencia" onClick={() => onSugerencia(sugerencia)}>
+                <IconoAmpolleta tam={16} />
+                <span>{sugerencia.texto}</span>
+              </button>
+            )}
+          </nav>
         )}
       </div>
 
-      <div className="workspace">
-        <div className="editor-panel">
-          <div className="editor-topline">
-            <span className="lang-pill">{ejercicio.lenguaje === 'python' ? 'Python' : 'Java'}</span>
-            <button className="run-btn" onClick={manejarEjecutar} disabled={ejecutando}>
-              {ejecutando ? 'Ejecutando…' : 'Ejecutar'}
-            </button>
-          </div>
-          <div className="editor-cuerpo">
-            <div className="editor-numeros" ref={numerosRef} aria-hidden="true">
-              {Array.from({ length: totalLineas }, (_, i) => (
-                <div key={i}>{i + 1}</div>
-              ))}
+      <div className="ct-ejercicio-cuerpo">
+        <section aria-label="Editor y consola" className="ct-editor-panel">
+          <div className="ct-editor-barra">
+            <div className="ct-editor-archivo">
+              <span className="ct-archivo">{NOMBRE_ARCHIVO[lenguaje]}</span>
+              <span className="ct-version">{VERSION[lenguaje]}</span>
             </div>
-            <textarea
-              className="editor-textarea"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              onScroll={sincronizarScroll}
-              onPaste={bloquearPegado}
-              onDrop={bloquearPegado}
-              spellCheck={false}
-              wrap="off"
-              aria-label="Editor de código"
-            />
+            <div className="ct-editor-acciones">
+              <button type="button" className="ct-btn-oscuro" onClick={reiniciar}>Reiniciar código</button>
+              <button type="button" className="ct-btn ct-btn-accion" onClick={ejecutar} disabled={ejecutando}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true">
+                  <polygon points="6 4 20 12 6 20 6 4" />
+                </svg>
+                {ejecutando ? 'Ejecutando…' : 'Ejecutar'}
+              </button>
+            </div>
           </div>
+
+          <Editor
+            codigo={codigo}
+            onCambio={setCodigo}
+            lenguaje={lenguaje}
+            lineaError={lineaError}
+            onPegadoBloqueado={bloquearPegado}
+          />
           {avisoPegado && (
-            <div className="aviso-pegado" role="status">
+            <div className="ct-aviso-pegado" role="status">
               Pegar código está desactivado en el editor: escríbelo tú para practicar.
             </div>
           )}
 
-          {consola && (
-            <div className="consola-panel">
-              <div className="consola-titulo">Consola</div>
-              {consola.fallo ? (
-                <div className="consola-linea consola-error">{consola.mensaje}</div>
-              ) : (
-                <>
-                  {consola.error_compilacion && (
-                    <pre className="consola-linea consola-error">{consola.error_compilacion}</pre>
-                  )}
-                  {consola.error && (
-                    <pre className="consola-linea consola-error">{consola.error}</pre>
-                  )}
-                  {consola.salida && (
-                    <pre className="consola-linea consola-ok">{consola.salida}</pre>
-                  )}
-                  {!consola.salida && !consola.error && !consola.error_compilacion && (
-                    <div className="consola-linea consola-vacio">
-                      El programa no produjo ninguna salida.
-                    </div>
-                  )}
-                  <div className="consola-estado">
-                    {consola.estado}
-                    {consola.tiempo_segundos && ` · ${consola.tiempo_segundos}s`}
-                  </div>
-                </>
+          <div className="ct-consola" aria-live="polite">
+            <div className="ct-consola-cabecera">
+              <span className="ct-consola-titulo">Consola</span>
+              {resultado && (
+                <span className="ct-consola-estado">
+                  {ESTADO_EJECUCION[resultado.estado] ||
+                    (/^Runtime Error/.test(resultado.estado || '') ? 'Error de ejecución' : resultado.estado)}
+                  {resultado.tiempo_segundos && ` · ${resultado.tiempo_segundos} s`}
+                  {!ejecucionVigente && ' · el código cambió desde esta ejecución'}
+                </span>
               )}
             </div>
-          )}
-        </div>
-
-        <div className="margen">
-          {notas.length === 0 && (
-            <div className="margen-vacio">
-              Escribe tu código, ejecútalo, y pregúntale al tutor cuando tengas una duda o un error.
-            </div>
-          )}
-
-          {notas.map((nota, i) => (
-            <div className="nota" key={i}>
-              <div className="nota-etiqueta">
-                {nota.tipo === 'explicacion' ? 'Explicación' : `Pista · intento ${nota.intento}`}
-              </div>
-              <div className="nota-texto">{nota.texto}</div>
-            </div>
-          ))}
-
-          {cargando && <div className="nota-cargando">El tutor está pensando…</div>}
-
-          {mensajeSistema && <div className="mensaje-sistema">{mensajeSistema}</div>}
-
-          {ofrecerDecision && (
-            <div className="oferta-decision">
-              <p className="oferta-texto">
-                Llevas un par de intentos con este ejercicio — ¿seguimos con pistas, o prefieres que
-                te explique la solución directamente?
-              </p>
-              <div className="oferta-botones">
-                <button
-                  className="btn-oferta secundario"
-                  onClick={() => setOfrecerDecision(false)}
-                >
-                  Sigo intentando
-                </button>
-                <button
-                  className="btn-oferta primario"
-                  onClick={() => enviarPregunta(true)}
-                >
-                  Explícamelo
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="pregunta-zona">
-            {mostrarErrorConsola && errorAutomatico && !ejecucionVigente && (
-              <div className="aviso-error-antiguo">
-                Este error es de una versión anterior de tu código. Vuelve a ejecutar para ver si sigue.
-              </div>
+            {ejecutando && <p className="ct-consola-vacia">Ejecutando tu código…</p>}
+            {!ejecutando && errorEjecucion && (
+              <div className="ct-consola-mensaje ct-consola-mensaje-error" role="alert">{errorEjecucion}</div>
             )}
-            {mostrarErrorConsola ? (
-              <textarea
-                className="error-consola-input"
-                placeholder="Pega aquí el error exacto que te muestra la consola (opcional, pero ayuda mucho)…"
-                value={errorConsola}
-                onChange={(e) => {
-                  setErrorConsola(e.target.value)
-                  setErrorAutomatico(false)
-                }}
-              />
-            ) : (
-              <button
-                className="link-mostrar-error"
-                onClick={() => setMostrarErrorConsola(true)}
-              >
-                + Agregar el error de consola
-              </button>
+            {!ejecutando && !errorEjecucion && !resultado && (
+              <p className="ct-consola-vacia">Ejecuta tu código para ver aquí el resultado.</p>
             )}
-
-            <div className="pregunta-caja">
-              <input
-                type="text"
-                placeholder="Pregunta algo sobre tu código…"
-                value={pregunta}
-                onChange={(e) => setPregunta(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && enviarPregunta(false)}
-                disabled={cargando}
-              />
-              <button
-                className="pregunta-enviar"
-                onClick={() => enviarPregunta(false)}
-                disabled={cargando || !pregunta.trim()}
-              >
-                ↑
-              </button>
-            </div>
+            {!ejecutando && !errorEjecucion && resultado && (
+              <>
+                <div className={`ct-consola-mensaje ct-consola-mensaje-${['error', 'tiempo'].includes(explicacion.tipo) ? 'error' : explicacion.tipo === 'resuelto' ? 'resuelto' : 'info'}`}>
+                  <span><b>{explicacion.titulo}</b> {explicacion.texto}</span>
+                </div>
+                {textoError && <pre className="ct-consola-salida ct-consola-salida-error">{textoError}</pre>}
+                {resultado.salida && <pre className="ct-consola-salida">{resultado.salida}</pre>}
+              </>
+            )}
           </div>
-        </div>
+        </section>
+
+        <Tutor
+          mensajes={mensajes}
+          cargando={cargandoTutor}
+          errorSistema={errorTutor}
+          ofrecerDecision={ofrecerDecision}
+          consultas={consultas}
+          adjunto={adjunto}
+          onPreguntar={(texto) => preguntar(texto)}
+          onSeguir={() => setOfrecerDecision(false)}
+          onExplicar={() => preguntar('', true)}
+        />
       </div>
     </div>
   )
