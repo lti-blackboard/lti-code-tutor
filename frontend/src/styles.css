@@ -1358,3 +1358,9 @@ a { color: var(--ct-enlace); }
   .ct-editor-cuerpo { font-size: 14px; height: 300px; }
   .ct-editor-numeros { width: 38px; padding-right: 10px; }
 }
+.ct-msj-burbuja .ct-msj-codigo {
+  margin: 0 0 8px; padding: 10px 12px; border-radius: 8px; background: #16161A; color: #E8E8EC;
+  font-family: var(--ct-fuente-codigo); font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.ct-msj-burbuja .ct-msj-codigo code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
+.ct-msj-burbuja .ct-msj-codigo:last-child { margin-bottom: 0; }
