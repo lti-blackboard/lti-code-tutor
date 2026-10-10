@@ -79,7 +79,10 @@ export default function SelectorEjercicios({ onSeleccionar, onIrAPanelDocente })
               .filter((e) => e.tema === tema)
               .map((ej) => (
                 <button key={ej.id} className="ejercicio-card" onClick={() => onSeleccionar(ej)}>
-                  <span className="ejercicio-card-titulo">{ej.titulo}</span>
+                  <span className="ejercicio-card-titulo">
+                    {ej.titulo}
+                    {ej.personalizado === 1 && <span className="tag-docente">Del docente</span>}
+                  </span>
                   <span className={`nivel-tag nivel-${ej.nivel}`}>{ej.nivel}</span>
                 </button>
               ))}

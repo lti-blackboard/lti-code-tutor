@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
+import { fetchDocente, guardarTokenDocente, obtenerTokenDocente } from './api.js'
+import LoginDocente from './LoginDocente.jsx'
+import EjerciciosDocente from './EjerciciosDocente.jsx'
 
 function claseDificultad(promedio) {
   if (promedio >= 2.5) return 'fill-alta'
@@ -21,7 +22,64 @@ function formatearFecha(fechaTexto) {
   }
 }
 
+// Contenedor del panel: pide inicio de sesión y separa las dos secciones.
 export default function PanelDocente({ onVolver }) {
+  const [token, setToken] = useState(obtenerTokenDocente())
+  const [seccion, setSeccion] = useState('actividad') // 'actividad' | 'ejercicios'
+
+  function cerrarSesion() {
+    guardarTokenDocente(null)
+    setToken(null)
+  }
+
+  return (
+    <div className="panel-docente">
+      <div className="header">
+        <div className="brand">
+          code<span>tutor</span>
+        </div>
+        <div className="pd-acciones">
+          {token && (
+            <button className="volver-btn" onClick={cerrarSesion}>
+              Cerrar sesión
+            </button>
+          )}
+          <button className="volver-btn" onClick={onVolver}>
+            ← Volver al catálogo
+          </button>
+        </div>
+      </div>
+
+      {!token ? (
+        <LoginDocente onEntrar={setToken} />
+      ) : (
+        <>
+          <div className="pd-tabs">
+            <button
+              className={seccion === 'actividad' ? 'pd-tab activo' : 'pd-tab'}
+              onClick={() => setSeccion('actividad')}
+            >
+              Actividad del curso
+            </button>
+            <button
+              className={seccion === 'ejercicios' ? 'pd-tab activo' : 'pd-tab'}
+              onClick={() => setSeccion('ejercicios')}
+            >
+              Mis ejercicios
+            </button>
+          </div>
+          {seccion === 'actividad' ? (
+            <ActividadCurso onNoAutorizado={cerrarSesion} />
+          ) : (
+            <EjerciciosDocente onNoAutorizado={cerrarSesion} />
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function ActividadCurso({ onNoAutorizado }) {
   const [resumen, setResumen] = useState(null)
   const [alertas, setAlertas] = useState([])
   const [sugerencias, setSugerencias] = useState([])
@@ -39,29 +97,29 @@ export default function PanelDocente({ onVolver }) {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_BASE}/docente/resumen`).then((r) => r.json()),
-      fetch(`${API_BASE}/docente/alertas`).then((r) => r.json()),
-      fetch(`${API_BASE}/docente/sugerencias`)
-        .then((r) => r.json())
-        .catch(() => ({ sugerencias: [] })),
+      fetchDocente('/docente/resumen'),
+      fetchDocente('/docente/alertas'),
+      fetchDocente('/docente/sugerencias').catch(() => ({ sugerencias: [] })),
     ])
       .then(([resumenData, alertasData, sugerenciasData]) => {
         setResumen(resumenData)
         setAlertas(alertasData.alertas)
         setSugerencias(sugerenciasData.sugerencias || [])
       })
-      .catch(() => setError('No se pudo conectar con el backend.'))
+      .catch((err) => {
+        if (err.codigo === 'NO_AUTORIZADO') onNoAutorizado()
+        else setError('No se pudo conectar con el backend.')
+      })
       .finally(() => setCargando(false))
   }, [])
 
   async function pedirAnalisis() {
     setAnalizando(true)
     try {
-      const respuesta = await fetch(`${API_BASE}/docente/analisis-ia`, { method: 'POST' })
-      const datos = await respuesta.json()
-      if (!respuesta.ok) throw new Error(datos.detail || 'Error')
+      const datos = await fetchDocente('/docente/analisis-ia', { method: 'POST' })
       setAnalisis(datos)
     } catch (err) {
+      if (err.codigo === 'NO_AUTORIZADO') return onNoAutorizado()
       setAnalisis({ error: err.message || 'No se pudo generar el análisis.' })
     } finally {
       setAnalizando(false)
@@ -73,10 +131,10 @@ export default function PanelDocente({ onVolver }) {
     setCargandoDetalle(true)
     setDetalle(null)
     try {
-      const respuesta = await fetch(`${API_BASE}/docente/detalle/${sesionId}/${ejercicioId}`)
-      const datos = await respuesta.json()
+      const datos = await fetchDocente(`/docente/detalle/${sesionId}/${ejercicioId}`)
       setDetalle(datos)
-    } catch {
+    } catch (err) {
+      if (err.codigo === 'NO_AUTORIZADO') return onNoAutorizado()
       setDetalle({ error: true })
     } finally {
       setCargandoDetalle(false)
@@ -89,16 +147,7 @@ export default function PanelDocente({ onVolver }) {
   const { kpis, ejercicios } = resumen
 
   return (
-    <div className="panel-docente">
-      <div className="header">
-        <div className="brand">
-          code<span>tutor</span>
-        </div>
-        <button className="volver-btn" onClick={onVolver}>
-          ← Volver al catálogo
-        </button>
-      </div>
-
+    <div>
       <h1 className="pd-titulo">Actividad del curso</h1>
       <p className="pd-subtitulo">
         Resumen de cómo están usando el tutor tus estudiantes, por ejercicio.

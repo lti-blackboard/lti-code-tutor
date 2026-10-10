@@ -7,15 +7,21 @@ GET /docente/detalle/{sesion_id}/{ejercicio_id} -> historial completo de una ses
 GET /docente/sugerencias                      -> sugerencias por reglas (sin IA)
 POST /docente/analisis-ia                     -> análisis de las preguntas con Claude
 
-Nota: esta primera versión no tiene autenticación de profesor todavía
-(cualquiera con la URL puede verlo) — se deja como trabajo futuro,
-junto con el inicio de sesión real vía LTI.
+Todas estas rutas exigen el token del docente (ver app/auth.py). Con la
+integración LTI, el acceso vendrá del rol que entrega Blackboard.
+
+GET    /docente/ejercicios        -> ejercicios creados por el docente
+POST   /docente/ejercicios        -> crear un ejercicio
+PUT    /docente/ejercicios/{id}   -> editar un ejercicio propio
+DELETE /docente/ejercicios/{id}   -> eliminar un ejercicio propio
 """
 
 import time
+import uuid
 
 import anthropic
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, field_validator
 
 from app.config import settings
 from app.db import (
@@ -24,6 +30,10 @@ from app.db import (
     obtener_alertas,
     obtener_detalle_sesion_ejercicio,
     obtener_preguntas_recientes,
+    listar_ejercicios_docente,
+    crear_ejercicio_docente,
+    actualizar_ejercicio_docente,
+    eliminar_ejercicio_docente,
 )
 from app.logger import logger
 from app.sugerencias import generar_sugerencias
@@ -132,3 +142,88 @@ def analisis_ia():
     _CACHE_ANALISIS["momento"] = ahora
     _CACHE_ANALISIS["resultado"] = resultado
     return resultado
+
+
+# ---------- Ejercicios creados por el docente ----------
+TEMAS_VALIDOS = [
+    "variables", "condicionales", "ciclos", "funciones", "listas", "recursividad", "poo",
+]
+NIVELES_VALIDOS = ["básico", "intermedio", "avanzado"]
+
+
+class EjercicioDocente(BaseModel):
+    titulo: str
+    tema: str
+    nivel: str
+    lenguaje: str
+    enunciado: str
+    codigo_base: str = ""
+
+    @field_validator("titulo", "enunciado")
+    @classmethod
+    def no_vacio(cls, valor: str) -> str:
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("Este campo no puede estar vacío.")
+        if len(valor) > 2000:
+            raise ValueError("El texto es demasiado largo (máximo 2.000 caracteres).")
+        return valor
+
+    @field_validator("tema")
+    @classmethod
+    def tema_valido(cls, valor: str) -> str:
+        if valor not in TEMAS_VALIDOS:
+            raise ValueError("Tema no válido.")
+        return valor
+
+    @field_validator("nivel")
+    @classmethod
+    def nivel_valido(cls, valor: str) -> str:
+        if valor not in NIVELES_VALIDOS:
+            raise ValueError("El nivel debe ser básico, intermedio o avanzado.")
+        return valor
+
+    @field_validator("lenguaje")
+    @classmethod
+    def lenguaje_valido(cls, valor: str) -> str:
+        valor = valor.strip().lower()
+        if valor not in settings.lenguajes_permitidos:
+            raise ValueError("El lenguaje debe ser python o java.")
+        return valor
+
+    @field_validator("codigo_base")
+    @classmethod
+    def codigo_largo(cls, valor: str) -> str:
+        if len(valor) > settings.max_caracteres_codigo:
+            raise ValueError(
+                f"El código base supera el máximo de {settings.max_caracteres_codigo} caracteres."
+            )
+        return valor
+
+
+@router.get("/ejercicios")
+def ejercicios_docente():
+    return {"ejercicios": listar_ejercicios_docente()}
+
+
+@router.post("/ejercicios")
+def crear_ejercicio(datos: EjercicioDocente):
+    sufijo = "py" if datos.lenguaje == "python" else "java"
+    datos_dict = datos.model_dump()
+    datos_dict["id"] = f"doc-{uuid.uuid4().hex[:8]}-{sufijo}"
+    return crear_ejercicio_docente(datos_dict)
+
+
+@router.put("/ejercicios/{ejercicio_id}")
+def editar_ejercicio(ejercicio_id: str, datos: EjercicioDocente):
+    resultado = actualizar_ejercicio_docente(ejercicio_id, datos.model_dump())
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Solo se pueden editar ejercicios propios.")
+    return resultado
+
+
+@router.delete("/ejercicios/{ejercicio_id}")
+def borrar_ejercicio(ejercicio_id: str):
+    if not eliminar_ejercicio_docente(ejercicio_id):
+        raise HTTPException(status_code=404, detail="Solo se pueden eliminar ejercicios propios.")
+    return {"eliminado": ejercicio_id}

@@ -20,11 +20,13 @@ Prototipo funcional desplegado en línea (Avance 1).
 - Protecciones del tutor: instrucciones blindadas contra manipulación, validación de entradas, límite de 15 consultas cada 10 minutos por sesión y recorte de errores largos (máximo 20 líneas).
 - Panel docente: consultas al tutor registradas, sesiones de estudiante, casos con 3 o más intentos en un mismo ejercicio, porcentaje que pidió explicación directa, mapa de dificultad por ejercicio, alertas e historial por sesión.
 - Base de datos permanente en PostgreSQL (Neon).
+- Acceso docente con usuario y contraseña (variables `DOCENTE_USUARIO` y `DOCENTE_CLAVE` en el servidor; nunca en el código).
+- El docente puede crear, editar y eliminar ejercicios propios (Python o Java, con tema y nivel), que aparecen en el catálogo con la etiqueta "Del docente".
+- Sugerencias para el docente por reglas y análisis de las preguntas con IA.
 
 **Pendiente:**
 
 - Integración LTI 1.3 real con Blackboard (los endpoints `/lti` son por ahora un esqueleto), incluida la devolución de notas.
-- Autenticación del panel docente (hoy no tiene; se resolverá con los roles que entrega LTI).
 - Traductor Python↔Java.
 - Pruebas automatizadas y piloto con estudiantes.
 
@@ -59,6 +61,8 @@ Crear un archivo `.env` (nunca subirlo a GitHub) con al menos:
 ```
 ANTHROPIC_API_KEY=tu_clave
 ```
+
+Para el panel docente: `DOCENTE_USUARIO` y `DOCENTE_CLAVE` (sin ellas el panel queda cerrado).
 
 Variables opcionales: `DATABASE_URL` (PostgreSQL; sin ella se usa SQLite local), `MODELO_IA`, `RATE_LIMIT_MAX_CONSULTAS`, `RATE_LIMIT_VENTANA_MINUTOS`, `MAX_CARACTERES_CODIGO`, `MAX_CARACTERES_PREGUNTA`, `LTI_CLIENT_ID`, `LTI_ISSUER`.
 

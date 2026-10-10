@@ -83,3 +83,48 @@ export async function ejecutarCodigo({ codigo, lenguaje, entrada, ejercicioId })
   })
   return manejarRespuesta(respuesta)
 }
+
+
+// ---------- Acceso docente ----------
+// El token se guarda en sessionStorage: se borra al cerrar el navegador.
+const CLAVE_TOKEN = 'token_docente'
+
+export function obtenerTokenDocente() {
+  return sessionStorage.getItem(CLAVE_TOKEN)
+}
+
+export function guardarTokenDocente(token) {
+  if (token) sessionStorage.setItem(CLAVE_TOKEN, token)
+  else sessionStorage.removeItem(CLAVE_TOKEN)
+}
+
+export async function loginDocente(usuario, clave) {
+  const respuesta = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario, clave }),
+  })
+  const datos = await manejarRespuesta(respuesta)
+  guardarTokenDocente(datos.token)
+  return datos.token
+}
+
+// Llamada a una ruta protegida del panel. Si la sesión venció, borra el
+// token y lanza un error con codigo = 'NO_AUTORIZADO'.
+export async function fetchDocente(ruta, opciones = {}) {
+  const respuesta = await fetch(`${API_BASE}${ruta}`, {
+    ...opciones,
+    headers: {
+      ...(opciones.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(opciones.headers || {}),
+      Authorization: `Bearer ${obtenerTokenDocente() || ''}`,
+    },
+  })
+  if (respuesta.status === 401) {
+    guardarTokenDocente(null)
+    const error = new Error('Tu sesión venció. Vuelve a ingresar.')
+    error.codigo = 'NO_AUTORIZADO'
+    throw error
+  }
+  return manejarRespuesta(respuesta)
+}

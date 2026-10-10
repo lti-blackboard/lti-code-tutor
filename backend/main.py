@@ -5,10 +5,11 @@ Levanta el servidor con:
     uvicorn main:app --reload
 """
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import health, lti, ai, ejercicios, sandbox, docente
+from app import auth
 from app.db import init_db, cargar_catalogo_inicial
 from app.catalogo_ejercicios import CATALOGO_EJERCICIOS
 
@@ -34,4 +35,10 @@ app.include_router(lti.router, prefix="/lti", tags=["LTI"])
 app.include_router(ai.router, prefix="/ai", tags=["IA / Tutor"])
 app.include_router(ejercicios.router, prefix="/ejercicios", tags=["Ejercicios"])
 app.include_router(sandbox.router, prefix="/sandbox", tags=["Sandbox de ejecución"])
-app.include_router(docente.router, prefix="/docente", tags=["Panel Docente"])
+app.include_router(auth.router, prefix="/auth", tags=["Acceso docente"])
+app.include_router(
+    docente.router,
+    prefix="/docente",
+    tags=["Panel Docente"],
+    dependencies=[Depends(auth.requiere_docente)],
+)

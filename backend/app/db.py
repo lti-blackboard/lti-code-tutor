@@ -114,8 +114,22 @@ def init_db():
         )
         """
     )
+    # Columna agregada después: marca los ejercicios creados por el docente.
+    if not _existe_columna(conn, "ejercicios", "personalizado"):
+        conn.execute("ALTER TABLE ejercicios ADD COLUMN personalizado INTEGER DEFAULT 0")
     conn.commit()
     conn.close()
+
+
+def _existe_columna(conn, tabla: str, columna: str) -> bool:
+    if USA_POSTGRES:
+        fila = conn.execute(
+            "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+            (tabla, columna),
+        ).fetchone()
+        return fila is not None
+    filas = conn.execute(f"PRAGMA table_info({tabla})").fetchall()
+    return any(f["name"] == columna for f in filas)
 
 
 def contar_intentos(sesion_id: str, ejercicio_id: str) -> int:
@@ -198,6 +212,69 @@ def obtener_ejercicio(ejercicio_id: str):
     ).fetchone()
     conn.close()
     return dict(fila) if fila else None
+
+
+# ---------- Ejercicios creados por el docente ----------
+
+def listar_ejercicios_docente():
+    conn = get_connection()
+    filas = conn.execute(
+        "SELECT * FROM ejercicios WHERE personalizado = 1 ORDER BY orden ASC"
+    ).fetchall()
+    conn.close()
+    return [dict(f) for f in filas]
+
+
+def crear_ejercicio_docente(datos: dict) -> dict:
+    conn = get_connection()
+    siguiente = conn.execute(
+        "SELECT COALESCE(MAX(orden), 0) + 1 AS siguiente FROM ejercicios"
+    ).fetchone()["siguiente"]
+    conn.execute(
+        """
+        INSERT INTO ejercicios
+            (id, tema, titulo, enunciado, lenguaje, nivel, codigo_base, orden, personalizado)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """,
+        (
+            datos["id"], datos["tema"], datos["titulo"], datos["enunciado"],
+            datos["lenguaje"], datos["nivel"], datos["codigo_base"], siguiente,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return obtener_ejercicio(datos["id"])
+
+
+def actualizar_ejercicio_docente(ejercicio_id: str, datos: dict):
+    """Solo modifica ejercicios creados por el docente (no el catálogo base)."""
+    conn = get_connection()
+    cursor = conn.execute(
+        """
+        UPDATE ejercicios
+        SET tema = ?, titulo = ?, enunciado = ?, lenguaje = ?, nivel = ?, codigo_base = ?
+        WHERE id = ? AND personalizado = 1
+        """,
+        (
+            datos["tema"], datos["titulo"], datos["enunciado"], datos["lenguaje"],
+            datos["nivel"], datos["codigo_base"], ejercicio_id,
+        ),
+    )
+    actualizados = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return obtener_ejercicio(ejercicio_id) if actualizados else None
+
+
+def eliminar_ejercicio_docente(ejercicio_id: str) -> bool:
+    conn = get_connection()
+    cursor = conn.execute(
+        "DELETE FROM ejercicios WHERE id = ? AND personalizado = 1", (ejercicio_id,)
+    )
+    eliminados = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return eliminados > 0
 
 
 def cargar_catalogo_inicial(ejercicios: list):
