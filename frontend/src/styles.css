@@ -655,3 +655,10 @@ button { font-family: inherit; cursor: pointer; }
   color: #7a4b00;
   font-size: 14px;
 }
+
+/* Aviso cuando el error de consola ya no corresponde al código actual */
+.aviso-error-antiguo {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #7a4b00;
+}

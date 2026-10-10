@@ -39,7 +39,12 @@ from typing import Optional
 import anthropic
 
 from app.config import settings
-from app.db import contar_intentos, contar_consultas_recientes, registrar_intento
+from app.db import (
+    contar_intentos,
+    contar_consultas_recientes,
+    registrar_intento,
+    obtener_ejercicio,
+)
 from app.logger import logger
 from app.utils import truncar_texto
 
@@ -58,6 +63,16 @@ diagnosticar el problema.
 Si el estudiante NO incluyó el error de consola, y el código tiene más de
 una causa posible de falla, pídele que te comparta el mensaje de error
 exacto que le aparece, en vez de asumir cuál es el problema.
+
+Estado de la ejecución (viene indicado en el mensaje):
+- Si el código actual se ejecutó SIN errores, revisa si el código y su
+  salida cumplen el enunciado del ejercicio. Si lo cumplen, dile claramente
+  que está correcto y felicítalo en una o dos frases: no inventes errores ni
+  sigas dando pistas sobre problemas ya resueltos. Si corre pero no cumple
+  el enunciado, explícalo con una pista.
+- Si el estudiante modificó el código después de la última ejecución,
+  cualquier error anterior ya no aplica: revisa el código actual y pídele
+  que lo vuelva a ejecutar para confirmar.
 """
 
 BLINDAJE_INYECCION = """
@@ -143,6 +158,10 @@ class ConsultaTutor(BaseModel):
     ejercicio_id: str
     quiere_respuesta_directa: bool = False
     error_consola: Optional[str] = None
+    # Estado de la última ejecución del código ACTUAL, informado por el
+    # frontend: "ok", "con_error", "modificado" o "sin_ejecutar".
+    estado_ejecucion: Optional[str] = None
+    salida_consola: Optional[str] = None
 
     @field_validator("codigo")
     @classmethod
@@ -203,9 +222,13 @@ def consultar_tutor(consulta: ConsultaTutor):
     intentos_previos = contar_intentos(consulta.sesion_id, consulta.ejercicio_id)
     intento_actual = intentos_previos + 1
 
+    # Si el código actual ya corre sin errores, no tiene sentido ofrecer la
+    # explicación directa: el estudiante probablemente quiere confirmar.
+    codigo_funciona = consulta.estado_ejecucion == "ok"
+
     if consulta.quiere_respuesta_directa:
         system_prompt = SYSTEM_PROMPT_RESPUESTA_DIRECTA
-    elif intento_actual >= UMBRAL_OFRECER_RESPUESTA:
+    elif intento_actual >= UMBRAL_OFRECER_RESPUESTA and not codigo_funciona:
         system_prompt = SYSTEM_PROMPT_OFRECER_AYUDA
     else:
         system_prompt = SYSTEM_PROMPT_PISTA
@@ -215,14 +238,29 @@ def consultar_tutor(consulta: ConsultaTutor):
     # traceback gigante manualmente.
     error_consola_truncado = truncar_texto(consulta.error_consola) if consulta.error_consola else None
 
-    contenido = (
-        f"Lenguaje: {consulta.lenguaje}\n\n"
-        f"Código del estudiante:\n{consulta.codigo}\n\n"
-    )
+    ejercicio = obtener_ejercicio(consulta.ejercicio_id)
+    contenido = f"Lenguaje: {consulta.lenguaje}\n\n"
+    if ejercicio:
+        contenido += f"Enunciado del ejercicio:\n{ejercicio['enunciado']}\n\n"
+    contenido += f"Código del estudiante:\n{consulta.codigo}\n\n"
+
+    if consulta.estado_ejecucion == "ok":
+        salida = truncar_texto(consulta.salida_consola) or "(sin salida)"
+        contenido += (
+            "Estado: el código actual se ejecutó SIN errores.\n"
+            f"Salida de la consola:\n{salida}\n\n"
+        )
+    elif consulta.estado_ejecucion == "modificado":
+        contenido += (
+            "Estado: el estudiante modificó el código después de la última "
+            "ejecución y todavía no lo vuelve a ejecutar.\n\n"
+        )
+    elif consulta.estado_ejecucion == "sin_ejecutar":
+        contenido += "Estado: el estudiante todavía no ha ejecutado este código.\n\n"
 
     if error_consola_truncado:
         contenido += f"Error real que muestra la consola:\n{error_consola_truncado}\n\n"
-    else:
+    elif consulta.estado_ejecucion != "ok":
         contenido += "El estudiante no incluyó el mensaje de error de consola.\n\n"
 
     contenido += f"Pregunta del estudiante: {consulta.pregunta}"
@@ -286,5 +324,6 @@ def consultar_tutor(consulta: ConsultaTutor):
         "respuesta": respuesta_texto,
         "intento_numero": intento_actual,
         "se_ofrecio_respuesta_directa": intento_actual >= UMBRAL_OFRECER_RESPUESTA
-        and not consulta.quiere_respuesta_directa,
+        and not consulta.quiere_respuesta_directa
+        and not codigo_funciona,
     }

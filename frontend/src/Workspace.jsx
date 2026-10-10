@@ -28,6 +28,16 @@ export default function Workspace({ ejercicio, onVolver }) {
   const [consola, setConsola] = useState(null)
   const [ejecutando, setEjecutando] = useState(false)
 
+  // Resultado de la última ejecución, junto con el código que la produjo.
+  // Sirve para que el tutor sepa si el código actual ya funcionó, si sigue
+  // con error o si fue modificado después de ejecutarlo.
+  const [ultimaEjecucion, setUltimaEjecucion] = useState(null)
+  // true si el texto de "error de consola" lo puso el sistema al ejecutar
+  // (y no el estudiante a mano): ese error se descarta cuando ya no aplica.
+  const [errorAutomatico, setErrorAutomatico] = useState(false)
+
+  const ejecucionVigente = ultimaEjecucion !== null && ultimaEjecucion.codigo === codigo
+
   async function manejarEjecutar() {
     setEjecutando(true)
     setConsola(null)
@@ -38,10 +48,17 @@ export default function Workspace({ ejercicio, onVolver }) {
       // Si el código falló (error de ejecución o de compilación), ofrecemos
       // pasar ese error directo al campo de "error de consola" para el tutor,
       // así el estudiante no tiene que copiarlo y pegarlo a mano.
-      const huboError = resultado.error || resultado.error_compilacion
-      if (huboError) {
-        setErrorConsola(resultado.error_compilacion || resultado.error)
+      const textoError = resultado.error_compilacion || resultado.error || null
+      setUltimaEjecucion({ codigo, error: textoError, salida: resultado.salida || '' })
+      if (textoError) {
+        setErrorConsola(textoError)
         setMostrarErrorConsola(true)
+        setErrorAutomatico(true)
+      } else if (errorAutomatico) {
+        // El código ya corre sin errores: el error anterior dejó de aplicar.
+        setErrorConsola('')
+        setMostrarErrorConsola(false)
+        setErrorAutomatico(false)
       }
     } catch (err) {
       setConsola({ fallo: true, mensaje: err.message })
@@ -63,7 +80,16 @@ export default function Workspace({ ejercicio, onVolver }) {
         pregunta: quiereRespuestaDirecta ? 'El estudiante pidió la explicación directa.' : pregunta,
         lenguaje: ejercicio.lenguaje,
         ejercicioId: ejercicio.id,
-        errorConsola: errorConsola.trim() || undefined,
+        // Un error automático solo se envía si corresponde al código actual.
+        errorConsola: errorAutomatico && !ejecucionVigente ? undefined : errorConsola.trim() || undefined,
+        estadoEjecucion: !ultimaEjecucion
+          ? 'sin_ejecutar'
+          : !ejecucionVigente
+            ? 'modificado'
+            : ultimaEjecucion.error
+              ? 'con_error'
+              : 'ok',
+        salidaConsola: ejecucionVigente && !ultimaEjecucion.error ? ultimaEjecucion.salida : undefined,
         quiereRespuestaDirecta,
       })
 
@@ -204,12 +230,20 @@ export default function Workspace({ ejercicio, onVolver }) {
           )}
 
           <div className="pregunta-zona">
+            {mostrarErrorConsola && errorAutomatico && !ejecucionVigente && (
+              <div className="aviso-error-antiguo">
+                Este error es de una versión anterior de tu código. Vuelve a ejecutar para ver si sigue.
+              </div>
+            )}
             {mostrarErrorConsola ? (
               <textarea
                 className="error-consola-input"
                 placeholder="Pega aquí el error exacto que te muestra la consola (opcional, pero ayuda mucho)…"
                 value={errorConsola}
-                onChange={(e) => setErrorConsola(e.target.value)}
+                onChange={(e) => {
+                  setErrorConsola(e.target.value)
+                  setErrorAutomatico(false)
+                }}
               />
             ) : (
               <button
@@ -223,7 +257,7 @@ export default function Workspace({ ejercicio, onVolver }) {
             <div className="pregunta-caja">
               <input
                 type="text"
-                placeholder="Preguntá algo sobre tu código…"
+                placeholder="Pregunta algo sobre tu código…"
                 value={pregunta}
                 onChange={(e) => setPregunta(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && enviarPregunta(false)}

@@ -46,6 +46,8 @@ export async function consultarTutor({
   lenguaje,
   ejercicioId,
   errorConsola,
+  estadoEjecucion,
+  salidaConsola,
   quiereRespuestaDirecta,
 }) {
   const respuesta = await fetch(`${API_BASE}/ai/tutor`, {
@@ -58,6 +60,8 @@ export async function consultarTutor({
       sesion_id: obtenerSesionId(),
       ejercicio_id: ejercicioId,
       error_consola: errorConsola || null,
+      estado_ejecucion: estadoEjecucion || null,
+      salida_consola: salidaConsola ?? null,
       quiere_respuesta_directa: quiereRespuestaDirecta || false,
     }),
   })
