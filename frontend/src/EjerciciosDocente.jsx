@@ -1,17 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchDocente } from './api.js'
-
-const TEMAS = [
-  ['variables', 'Variables y tipos de datos'],
-  ['condicionales', 'Condicionales'],
-  ['ciclos', 'Ciclos'],
-  ['funciones', 'Funciones'],
-  ['listas', 'Listas / arreglos'],
-  ['recursividad', 'Recursividad'],
-  ['poo', 'Programación orientada a objetos'],
-]
-const NIVELES = ['básico', 'intermedio', 'avanzado']
-const nombreTema = (clave) => (TEMAS.find((t) => t[0] === clave) || [clave, clave])[1]
+import { NIVELES, NOMBRE_LENGUAJE, TEMAS, etiquetaNivel, nombreTema } from './catalogo.js'
+import Modal from './Modal.jsx'
 
 const VACIO = {
   titulo: '',
@@ -20,255 +10,379 @@ const VACIO = {
   lenguaje: 'python',
   enunciado: '',
   codigo_base: '',
+  salida_esperada: '',
+}
+
+// Origen de cada ejercicio (lo calcula el backend).
+const ORIGEN = {
+  base: { texto: 'Base', ayuda: 'catálogo inicial del sistema' },
+  modificado: { texto: 'Modificado', ayuda: 'base editado por ti, se puede restaurar' },
+  creado: { texto: 'Creado por ti', ayuda: 'se puede eliminar' },
 }
 
 export default function EjerciciosDocente({ onNoAutorizado }) {
   const [ejercicios, setEjercicios] = useState([])
-  const [form, setForm] = useState(VACIO)
-  const [editandoId, setEditandoId] = useState(null)
-  const [guardando, setGuardando] = useState(false)
+  const [cargando, setCargando] = useState(true)
   const [mensaje, setMensaje] = useState(null)
   const [error, setError] = useState(null)
-  const [confirmarBorrar, setConfirmarBorrar] = useState(null)
 
-  function manejarError(err) {
-    if (err.codigo === 'NO_AUTORIZADO') onNoAutorizado()
+  // Edición: null (cerrado), 'nuevo' o el ejercicio que se edita.
+  const [editando, setEditando] = useState(null)
+  const [form, setForm] = useState(VACIO)
+  const [guardando, setGuardando] = useState(false)
+  const [errorForm, setErrorForm] = useState(null)
+
+  // Acciones que piden confirmación con un segundo clic: { id, accion }.
+  const [confirmar, setConfirmar] = useState(null)
+
+  // Filtro por lenguaje para recorrer la lista con más comodidad.
+  const [lenguaje, setLenguaje] = useState('todos')
+
+  function manejarError(err, enFormulario = false) {
+    if (err.codigo === 'NO_AUTORIZADO') return onNoAutorizado()
+    if (enFormulario) setErrorForm(err.message)
     else setError(err.message)
   }
 
   function cargar() {
     fetchDocente('/docente/ejercicios')
-      // Por ahora esta pestaña muestra solo los creados por el docente;
-      // la gestión de todos los ejercicios llega con el rediseño del panel.
-      .then((datos) => setEjercicios(datos.ejercicios.filter((e) => e.origen === 'creado')))
-      .catch(manejarError)
+      .then((datos) => setEjercicios(datos.ejercicios))
+      .catch((err) => manejarError(err))
+      .finally(() => setCargando(false))
   }
 
   useEffect(cargar, [])
 
-  function cambiar(campo, valor) {
-    setForm((f) => ({ ...f, [campo]: valor }))
-  }
-
-  async function guardar(e) {
-    e.preventDefault()
-    setGuardando(true)
+  function avisar(texto) {
     setError(null)
-    setMensaje(null)
-    try {
-      const ruta = editandoId ? `/docente/ejercicios/${editandoId}` : '/docente/ejercicios'
-      await fetchDocente(ruta, {
-        method: editandoId ? 'PUT' : 'POST',
-        body: JSON.stringify(form),
-      })
-      const lenguaje = form.lenguaje === 'python' ? 'Python' : 'Java'
-      setMensaje(
-        editandoId
-          ? 'Cambios guardados.'
-          : `Ejercicio creado. Ya aparece en el catálogo de ${lenguaje}, en el tema ${nombreTema(form.tema)}.`
-      )
-      setForm(VACIO)
-      setEditandoId(null)
-      cargar()
-    } catch (err) {
-      manejarError(err)
-    } finally {
-      setGuardando(false)
-    }
+    setMensaje(texto)
   }
 
-  function editar(ej) {
-    setEditandoId(ej.id)
+  function abrirNuevo() {
+    setEditando('nuevo')
+    setForm(VACIO)
+    setErrorForm(null)
+  }
+
+  function abrirEdicion(ej) {
+    setEditando(ej)
     setForm({
       titulo: ej.titulo,
       tema: ej.tema,
       nivel: ej.nivel,
       lenguaje: ej.lenguaje,
       enunciado: ej.enunciado,
-      codigo_base: ej.codigo_base,
+      codigo_base: ej.codigo_base || '',
+      salida_esperada: ej.salida_esperada || '',
     })
-    setMensaje(null)
-    setError(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setErrorForm(null)
   }
 
-  async function borrar(id) {
-    if (confirmarBorrar !== id) {
-      setConfirmarBorrar(id)
+  const cambiar = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
+
+  async function guardar(e) {
+    e.preventDefault()
+    setGuardando(true)
+    setErrorForm(null)
+    const esNuevo = editando === 'nuevo'
+    try {
+      await fetchDocente(esNuevo ? '/docente/ejercicios' : `/docente/ejercicios/${editando.id}`, {
+        method: esNuevo ? 'POST' : 'PUT',
+        body: JSON.stringify(form),
+      })
+      avisar(
+        esNuevo
+          ? `Ejercicio creado. Ya aparece para los estudiantes en ${NOMBRE_LENGUAJE[form.lenguaje]}, tema ${nombreTema(form.tema)}.`
+          : `Cambios guardados en «${form.titulo}».`,
+      )
+      setEditando(null)
+      cargar()
+    } catch (err) {
+      manejarError(err, true)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function alternarVisible(ej) {
+    const oculto = !ej.oculto
+    // Se actualiza la fila de inmediato y se revierte si falla.
+    setEjercicios((lista) => lista.map((x) => (x.id === ej.id ? { ...x, oculto: oculto ? 1 : 0 } : x)))
+    try {
+      await fetchDocente(`/docente/ejercicios/${ej.id}/visibilidad`, {
+        method: 'POST',
+        body: JSON.stringify({ oculto }),
+      })
+      avisar(
+        oculto
+          ? `«${ej.titulo}» quedó oculto para los estudiantes.`
+          : `«${ej.titulo}» vuelve a estar visible para los estudiantes.`,
+      )
+    } catch (err) {
+      setEjercicios((lista) => lista.map((x) => (x.id === ej.id ? { ...x, oculto: ej.oculto } : x)))
+      manejarError(err)
+    }
+  }
+
+  async function accionConConfirmacion(ej, accion) {
+    if (confirmar?.id !== ej.id || confirmar?.accion !== accion) {
+      setConfirmar({ id: ej.id, accion })
       return
     }
+    setConfirmar(null)
     try {
-      await fetchDocente(`/docente/ejercicios/${id}`, { method: 'DELETE' })
-      setConfirmarBorrar(null)
-      if (editandoId === id) {
-        setEditandoId(null)
-        setForm(VACIO)
+      if (accion === 'restaurar') {
+        await fetchDocente(`/docente/ejercicios/${ej.id}/restaurar`, { method: 'POST' })
+        avisar(`«${ej.titulo}» volvió a su versión original.`)
+      } else {
+        await fetchDocente(`/docente/ejercicios/${ej.id}`, { method: 'DELETE' })
+        avisar(`«${ej.titulo}» fue eliminado.`)
       }
-      setMensaje('Ejercicio eliminado del catálogo.')
       cargar()
     } catch (err) {
       manejarError(err)
     }
   }
 
+  const esNuevo = editando === 'nuevo'
+  const origenEditado = !esNuevo && editando ? editando.origen : null
+
   return (
-    <div>
-      <h1 className="pd-titulo">Mis ejercicios</h1>
-      <p className="pd-subtitulo">
-        Los ejercicios que crees aparecen en el catálogo principal, en el lenguaje y el tema que
-        elijas, junto a los ejercicios base.
-      </p>
-
-      <form className="form-ejercicio" onSubmit={guardar}>
-        <div className="seccion-titulo">{editandoId ? 'Editar ejercicio' : 'Nuevo ejercicio'}</div>
-
-        <label className="campo">
-          <span>Título</span>
-          <input
-            value={form.titulo}
-            onChange={(e) => cambiar('titulo', e.target.value)}
-            placeholder="Ej.: Tabla de multiplicar"
-            required
-          />
-        </label>
-
-        <div className="campos-fila">
-          <div className="campo">
-            <span>Lenguaje</span>
-            <div className="lang-toggle">
-              {[
-                ['python', 'Python'],
-                ['java', 'Java'],
-              ].map(([valor, texto]) => (
-                <button
-                  type="button"
-                  key={valor}
-                  className={form.lenguaje === valor ? 'lang-btn activo' : 'lang-btn'}
-                  onClick={() => cambiar('lenguaje', valor)}
-                >
-                  {texto}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="campo">
-            <span>Tema</span>
-            <select value={form.tema} onChange={(e) => cambiar('tema', e.target.value)}>
-              {TEMAS.map(([valor, texto]) => (
-                <option key={valor} value={valor}>
-                  {texto}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="campo">
-            <span>Nivel</span>
-            <select value={form.nivel} onChange={(e) => cambiar('nivel', e.target.value)}>
-              {NIVELES.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
+    <div className="dp-seccion">
+      <div className="dp-cabecera">
+        <div className="dp-cabecera-texto">
+          <h1 className="dp-titulo">
+            Ejercicios <b>del curso</b>
+          </h1>
+          <p className="dp-bajada dp-bajada-limitada">
+            Edita cualquier ejercicio, ocúltalo a los estudiantes o crea los tuyos. Los ejercicios
+            base modificados se pueden restaurar a su versión original.
+          </p>
         </div>
+        <button type="button" className="ct-btn ct-btn-accion dp-btn-grande" onClick={abrirNuevo}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Nuevo ejercicio
+        </button>
+      </div>
 
-        <label className="campo">
-          <span>Enunciado</span>
-          <textarea
-            rows={3}
-            value={form.enunciado}
-            onChange={(e) => cambiar('enunciado', e.target.value)}
-            placeholder="Lo que el estudiante debe lograr."
-            required
-          />
-        </label>
-
-        <label className="campo">
-          <span>Código base (opcional)</span>
-          <textarea
-            className="codigo-base"
-            rows={8}
-            value={form.codigo_base}
-            onChange={(e) => cambiar('codigo_base', e.target.value)}
-            placeholder={
-              form.lenguaje === 'java'
-                ? 'public class Main {\n    public static void main(String[] args) {\n    }\n}'
-                : 'def mi_funcion():\n    pass'
-            }
-            spellCheck={false}
-          />
-          <small>
-            Es el código con el que parte el estudiante. Puede traer un error intencional o estar
-            incompleto. En Java, la clase principal debe llamarse Main.
-          </small>
-        </label>
-
-        {error && <div className="mensaje-sistema">{error}</div>}
-        {mensaje && <div className="mensaje-ok">{mensaje}</div>}
-
-        <div className="form-acciones">
-          <button className="analisis-btn" type="submit" disabled={guardando}>
-            {guardando ? 'Guardando…' : editandoId ? 'Guardar cambios' : 'Crear ejercicio'}
-          </button>
-          {editandoId && (
+      <div className="dp-leyenda-fila">
+        <div className="dp-leyenda">
+          {Object.entries(ORIGEN).map(([clave, o]) => (
+            <span key={clave} className="dp-leyenda-item">
+              <span className={`dp-origen dp-origen-${clave}`}>{o.texto}</span> {o.ayuda}
+            </span>
+          ))}
+        </div>
+        <div role="group" aria-label="Filtrar ejercicios por lenguaje" className="dp-filtros">
+          {[
+            ['todos', 'Todos'],
+            ['python', 'Python'],
+            ['java', 'Java'],
+          ].map(([clave, texto]) => (
             <button
+              key={clave}
               type="button"
-              className="volver-btn"
-              onClick={() => {
-                setEditandoId(null)
-                setForm(VACIO)
-              }}
+              aria-pressed={lenguaje === clave}
+              className="dp-filtro"
+              onClick={() => setLenguaje(clave)}
             >
-              Cancelar edición
+              {texto}
             </button>
-          )}
+          ))}
         </div>
-      </form>
+      </div>
 
-      <div className="seccion-titulo">Ejercicios creados ({ejercicios.length})</div>
-      {ejercicios.length === 0 ? (
-        <div className="margen-vacio">Todavía no has creado ejercicios.</div>
+      {mensaje && <div className="dp-mensaje-ok" role="status">{mensaje}</div>}
+      {error && <div className="dp-error" role="alert">{error}</div>}
+
+      {cargando ? (
+        <div className="dp-estado">Cargando ejercicios…</div>
       ) : (
-        <div className="tabla-wrap">
-          <table>
+        <div className="dp-tabla-caja">
+          <table className="dp-tabla dp-tabla-ejercicios">
             <thead>
               <tr>
-                <th>Ejercicio</th>
-                <th>Lenguaje</th>
-                <th>Nivel</th>
-                <th></th>
+                <th scope="col">Ejercicio</th>
+                <th scope="col">Lenguaje</th>
+                <th scope="col">Nivel</th>
+                <th scope="col">Origen</th>
+                <th scope="col">Visible</th>
+                <th scope="col" className="dp-col-acciones">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {ejercicios.map((ej) => (
-                <tr key={ej.id}>
-                  <td>
-                    <div className="ejercicio-nombre">{ej.titulo}</div>
-                    <div className="ejercicio-tema">{nombreTema(ej.tema)}</div>
-                  </td>
-                  <td>
-                    <span className="lenguaje-pill">{ej.lenguaje}</span>
-                  </td>
-                  <td>
-                    <span className={`nivel-tag nivel-${ej.nivel}`}>{ej.nivel}</span>
-                  </td>
-                  <td className="acciones-celda">
-                    <button className="volver-btn" onClick={() => editar(ej)}>
-                      Editar
-                    </button>
-                    <button
-                      className={confirmarBorrar === ej.id ? 'borrar-btn confirmar' : 'borrar-btn'}
-                      onClick={() => borrar(ej.id)}
-                    >
-                      {confirmarBorrar === ej.id ? '¿Seguro? Eliminar' : 'Eliminar'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {ejercicios.filter((ej) => lenguaje === 'todos' || ej.lenguaje === lenguaje).map((ej) => {
+                const oculto = !!ej.oculto
+                const confirmando = (accion) => confirmar?.id === ej.id && confirmar?.accion === accion
+                return (
+                  <tr key={ej.id} className={oculto ? 'dp-fila-oculta' : ''}>
+                    <td>
+                      <div className="dp-celda-titulo">{ej.titulo}</div>
+                      <div className="dp-celda-tema">{nombreTema(ej.tema)}</div>
+                    </td>
+                    <td><span className="dp-lenguaje">{ej.lenguaje}</span></td>
+                    <td>{etiquetaNivel(ej.nivel)}</td>
+                    <td>
+                      <span className={`dp-origen dp-origen-${ej.origen}`}>
+                        {(ORIGEN[ej.origen] || ORIGEN.base).texto}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="dp-interruptor"
+                        role="switch"
+                        aria-checked={!oculto}
+                        aria-label={`Visible para estudiantes: ${ej.titulo} (${ej.lenguaje})`}
+                        onClick={() => alternarVisible(ej)}
+                      >
+                        <span className="dp-interruptor-perilla" aria-hidden="true" />
+                      </button>
+                    </td>
+                    <td className="dp-col-acciones">
+                      <span className="dp-acciones">
+                        <button type="button" className="dp-accion" onClick={() => abrirEdicion(ej)}>
+                          Editar
+                        </button>
+                        {ej.origen === 'modificado' && (
+                          <button
+                            type="button"
+                            className="dp-accion dp-accion-restaurar"
+                            onClick={() => accionConConfirmacion(ej, 'restaurar')}
+                          >
+                            {confirmando('restaurar') ? '¿Seguro? Restaurar' : 'Restaurar original'}
+                          </button>
+                        )}
+                        {ej.origen === 'creado' && (
+                          <button
+                            type="button"
+                            className="dp-accion dp-accion-eliminar"
+                            onClick={() => accionConConfirmacion(ej, 'eliminar')}
+                          >
+                            {confirmando('eliminar') ? '¿Seguro? Eliminar' : 'Eliminar'}
+                          </button>
+                        )}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {editando && (
+        <Modal
+          etiqueta={esNuevo ? 'Nuevo ejercicio' : `Editar ejercicio · ${ORIGEN[origenEditado]?.texto || ''}`}
+          titulo={esNuevo ? 'Crear ejercicio' : editando.titulo}
+          ancho={760}
+          onCerrar={() => setEditando(null)}
+        >
+          <form className="dp-form" onSubmit={guardar}>
+            {origenEditado === 'base' && (
+              <p className="dp-form-aviso">
+                Es un ejercicio del catálogo base: al guardar quedará como «Modificado» y podrás
+                restaurar la versión original cuando quieras.
+              </p>
+            )}
+            <label className="dp-campo">
+              Título
+              <input
+                value={form.titulo}
+                onChange={(e) => cambiar('titulo', e.target.value)}
+                placeholder="Ej.: Tabla de multiplicar"
+                required
+              />
+            </label>
+            <div className="dp-campos-fila">
+              <label className="dp-campo">
+                Lenguaje
+                <select value={form.lenguaje} onChange={(e) => cambiar('lenguaje', e.target.value)}>
+                  {Object.entries(NOMBRE_LENGUAJE).map(([valor, texto]) => (
+                    <option key={valor} value={valor}>{texto}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="dp-campo">
+                Tema
+                <select value={form.tema} onChange={(e) => cambiar('tema', e.target.value)}>
+                  {TEMAS.map(([valor, texto]) => (
+                    <option key={valor} value={valor}>{texto}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="dp-campo">
+                Nivel
+                <select value={form.nivel} onChange={(e) => cambiar('nivel', e.target.value)}>
+                  {NIVELES.map(([valor, texto]) => (
+                    <option key={valor} value={valor}>{texto}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="dp-campo">
+              Enunciado
+              <textarea
+                rows={3}
+                value={form.enunciado}
+                onChange={(e) => cambiar('enunciado', e.target.value)}
+                placeholder="Lo que el estudiante debe lograr."
+                required
+              />
+            </label>
+            <div className="dp-campos-codigo">
+              <label className="dp-campo">
+                Código base
+                <textarea
+                  className="dp-codigo-oscuro"
+                  rows={8}
+                  value={form.codigo_base}
+                  onChange={(e) => cambiar('codigo_base', e.target.value)}
+                  placeholder={
+                    form.lenguaje === 'java'
+                      ? 'public class Main {\n    public static void main(String[] args) {\n    }\n}'
+                      : 'def mi_funcion():\n    pass'
+                  }
+                  spellCheck={false}
+                />
+                <span className="dp-campo-ayuda">
+                  Código con el que parte el estudiante; puede traer un error intencional. En Java,
+                  la clase principal debe llamarse Main.
+                </span>
+              </label>
+              <label className="dp-campo">
+                Salida esperada
+                <textarea
+                  className="dp-codigo-claro"
+                  rows={8}
+                  value={form.salida_esperada}
+                  onChange={(e) => cambiar('salida_esperada', e.target.value)}
+                  spellCheck={false}
+                />
+                <span className="dp-campo-ayuda">
+                  Lo que debe imprimir el programa correcto. Se usa para marcar el ejercicio como
+                  resuelto; si la dejas vacía, el ejercicio no se marca como resuelto.
+                </span>
+              </label>
+            </div>
+
+            {errorForm && <div className="dp-error" role="alert">{errorForm}</div>}
+
+            <div className="dp-form-acciones">
+              <button type="button" className="ct-btn ct-btn-secundario" onClick={() => setEditando(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="ct-btn ct-btn-accion" disabled={guardando}>
+                {guardando ? 'Guardando…' : esNuevo ? 'Crear ejercicio' : 'Guardar cambios'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   )

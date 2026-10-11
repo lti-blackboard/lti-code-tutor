@@ -5,8 +5,9 @@ import LogoUdla from './LogoUdla.jsx'
  * divisor y la marca codetutor (que siempre lleva al inicio).
  * "acciones" es el contenido de la derecha (por ejemplo, el botón
  * "Panel docente", que solo se muestra en el Paso 1).
+ * "etiqueta" es una insignia junto a la marca (por ejemplo, "Vista docente").
  */
-export default function Encabezado({ onInicio, acciones = null }) {
+export default function Encabezado({ onInicio, acciones = null, etiqueta = null }) {
   return (
     <>
       <div className="ct-franja" aria-hidden="true" />
@@ -36,6 +37,7 @@ export default function Encabezado({ onInicio, acciones = null }) {
                 </span>
               </span>
             </button>
+            {etiqueta && <span className="ct-etiqueta-vista">{etiqueta}</span>}
           </div>
           {acciones && <div className="ct-encabezado-acciones">{acciones}</div>}
         </div>

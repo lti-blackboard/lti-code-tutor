@@ -105,6 +105,12 @@ export async function ejecutarCodigo({ codigo, lenguaje, entrada, ejercicioId })
 // ---------- Acceso docente ----------
 // El token se guarda en sessionStorage: se borra al cerrar el navegador.
 const CLAVE_TOKEN = 'token_docente'
+const CLAVE_USUARIO = 'usuario_docente'
+
+// Nombre con el que ingresó el docente (se muestra en el encabezado).
+export function obtenerUsuarioDocente() {
+  return sessionStorage.getItem(CLAVE_USUARIO)
+}
 
 export function obtenerTokenDocente() {
   return sessionStorage.getItem(CLAVE_TOKEN)
@@ -112,7 +118,10 @@ export function obtenerTokenDocente() {
 
 export function guardarTokenDocente(token) {
   if (token) sessionStorage.setItem(CLAVE_TOKEN, token)
-  else sessionStorage.removeItem(CLAVE_TOKEN)
+  else {
+    sessionStorage.removeItem(CLAVE_TOKEN)
+    sessionStorage.removeItem(CLAVE_USUARIO)
+  }
 }
 
 export async function loginDocente(usuario, clave) {
@@ -123,6 +132,7 @@ export async function loginDocente(usuario, clave) {
   })
   const datos = await manejarRespuesta(respuesta)
   guardarTokenDocente(datos.token)
+  sessionStorage.setItem(CLAVE_USUARIO, usuario.trim())
   return datos.token
 }
 
