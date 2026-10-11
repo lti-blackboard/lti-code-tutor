@@ -37,6 +37,37 @@ const FILTROS_LENGUAJE = [
   ['java', 'Java'],
 ]
 
+// Muestra el análisis con IA: los títulos (líneas que terminan en ":") en
+// negrita y las viñetas como lista. Quita restos de Markdown por si acaso.
+function TextoAnalisis({ texto }) {
+  const bloques = []
+  for (const cruda of String(texto || '').split('\n')) {
+    const linea = cruda.replace(/\*\*|__|`/g, '').trim()
+    if (!linea || /^[-*_]{3,}$/.test(linea)) continue
+    const vineta = linea.match(/^[-*•]\s+(.*)$/)
+    if (vineta) {
+      const ultimo = bloques[bloques.length - 1]
+      if (ultimo && ultimo.tipo === 'lista') ultimo.items.push(vineta[1])
+      else bloques.push({ tipo: 'lista', items: [vineta[1]] })
+    } else {
+      bloques.push({ tipo: /:$/.test(linea) ? 'titulo' : 'parrafo', texto: linea })
+    }
+  }
+  return (
+    <div className="dp-analisis-texto">
+      {bloques.map((b, i) =>
+        b.tipo === 'lista' ? (
+          <ul key={i}>{b.items.map((t, j) => <li key={j}>{t}</li>)}</ul>
+        ) : b.tipo === 'titulo' ? (
+          <b key={i} className="dp-analisis-titulo">{b.texto}</b>
+        ) : (
+          <p key={i}>{b.texto}</p>
+        ),
+      )}
+    </div>
+  )
+}
+
 // Contenedor del panel: pide inicio de sesión y separa las dos pestañas.
 export default function PanelDocente({ token, onEntrar, onNoAutorizado }) {
   const [pestana, setPestana] = useState('actividad') // 'actividad' | 'ejercicios'
@@ -273,7 +304,7 @@ function ActividadCurso({ onNoAutorizado }) {
                   Análisis con IA de {analisis.preguntas_analizadas} preguntas recientes. Es una
                   ayuda para interpretar los datos, no un diagnóstico.
                 </span>
-                <div className="dp-analisis-texto">{analisis.analisis}</div>
+                <TextoAnalisis texto={analisis.analisis} />
               </div>
             )}
           </div>
