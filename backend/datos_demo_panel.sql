@@ -1,14 +1,20 @@
 -- Datos de DEMOSTRACIÓN (ficticios) para el panel docente.
 -- Todas las sesiones empiezan con "demo-". Se puede ejecutar varias veces:
 -- primero borra los datos demo anteriores y no toca los datos reales.
+-- "resuelto" = la salida coincidió con la salida esperada (solo es posible
+-- si la ejecución fue exitosa). Algunos casos quedan ejecutados sin errores
+-- pero sin resolver, para mostrar las dos situaciones en el panel.
 
 CREATE TABLE IF NOT EXISTS ejecuciones (
     id SERIAL PRIMARY KEY,
     sesion_id TEXT NOT NULL,
     ejercicio_id TEXT NOT NULL,
     exitosa INTEGER NOT NULL,
+    resuelto INTEGER DEFAULT 0,
     creado_en TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC')
 );
+
+ALTER TABLE ejecuciones ADD COLUMN IF NOT EXISTS resuelto INTEGER DEFAULT 0;
 
 DELETE FROM intentos WHERE sesion_id LIKE 'demo-%';
 DELETE FROM ejecuciones WHERE sesion_id LIKE 'demo-%';
@@ -137,3 +143,19 @@ INSERT INTO ejecuciones (sesion_id, ejercicio_id, exitosa, creado_en) VALUES
 ('demo-11','rec-02-py',0,NOW() AT TIME ZONE 'UTC' - INTERVAL '650 minutes'),
 ('demo-11','rec-02-py',1,NOW() AT TIME ZONE 'UTC' - INTERVAL '645 minutes'),
 ('demo-12','cond-01-java',0,NOW() AT TIME ZONE 'UTC' - INTERVAL '3181 minutes');
+
+-- Ejecuciones exitosas que además entregaron la salida esperada (resueltas).
+-- Quedan sin resolver, aunque corrieron sin errores: demo-02, demo-07 y
+-- demo-11 en Fibonacci (rec-02-py) y demo-08 en el promedio (func-01-py).
+UPDATE ejecuciones SET resuelto = 1
+WHERE exitosa = 1 AND (sesion_id, ejercicio_id) IN (
+    ('demo-02','var-01-py'),
+    ('demo-04','var-01-py'),
+    ('demo-05','var-01-py'),
+    ('demo-09','var-01-py'),
+    ('demo-03','cond-01-java'),
+    ('demo-03','rec-02-py'),
+    ('demo-10','rec-02-py'),
+    ('demo-05','lista-02-java'),
+    ('demo-05','func-01-py')
+);
