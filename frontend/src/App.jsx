@@ -8,6 +8,7 @@ import PanelDocente from './PanelDocente.jsx'
 import {
   guardarTokenDocente,
   listarEjercicios,
+  obtenerPanelAbierto,
   obtenerTokenDocente,
   obtenerUsuarioDocente,
 } from './api.js'
@@ -29,6 +30,11 @@ export default function App() {
 
   // Sesión del docente (se guarda en sessionStorage; ver api.js).
   const [tokenDocente, setTokenDocente] = useState(obtenerTokenDocente())
+  // null = aún no se sabe; true = el panel no pide usuario ni contraseña.
+  const [panelAbierto, setPanelAbierto] = useState(null)
+  useEffect(() => {
+    obtenerPanelAbierto().then(setPanelAbierto)
+  }, [])
   const cerrarSesionDocente = () => {
     guardarTokenDocente(null)
     setTokenDocente(null)
@@ -79,7 +85,7 @@ export default function App() {
           </svg>
           Ver como estudiante
         </button>
-        {tokenDocente && (
+        {tokenDocente && !panelAbierto && (
           <>
             <div className="ct-divisor-acciones" aria-hidden="true" />
             <div className="ct-docente-sesion">
@@ -118,7 +124,8 @@ export default function App() {
   } else if (vista === 'docente') {
     contenido = (
       <PanelDocente
-        token={tokenDocente}
+        token={panelAbierto ? 'abierto' : tokenDocente}
+        cargandoAcceso={panelAbierto === null && !tokenDocente}
         onEntrar={setTokenDocente}
         onNoAutorizado={cerrarSesionDocente}
       />

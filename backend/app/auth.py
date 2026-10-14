@@ -8,6 +8,11 @@ el servidor. Si no están configuradas, el panel queda cerrado.
 Al iniciar sesión se entrega un token firmado (HMAC-SHA256) que vence en
 8 horas. Es una solución simple para el prototipo; con la integración LTI,
 el acceso del docente vendrá del rol que entrega Blackboard.
+
+Para la evaluación del proyecto el panel queda ABIERTO por defecto (sin
+usuario ni contraseña), para que el profesor pueda revisarlo libremente.
+Para volver a exigir el inicio de sesión basta con definir en el servidor
+la variable de entorno PANEL_DOCENTE_ABIERTO=false.
 """
 
 import base64
@@ -60,11 +65,25 @@ def token_valido(token: str) -> bool:
         return False
 
 
+def panel_abierto() -> bool:
+    """True si el panel docente no exige inicio de sesión (valor por defecto)."""
+    return os.getenv("PANEL_DOCENTE_ABIERTO", "true").strip().lower() not in ("false", "0", "no")
+
+
 def requiere_docente(authorization: str = Header(default="")):
-    """Dependencia de FastAPI: exige un token válido en 'Authorization: Bearer ...'."""
+    """Dependencia de FastAPI: exige un token válido en 'Authorization: Bearer ...',
+    salvo que el panel esté abierto."""
+    if panel_abierto():
+        return
     token = authorization.removeprefix("Bearer ").strip()
     if not token or not token_valido(token):
         raise HTTPException(status_code=401, detail="Sesión de docente no válida o vencida.")
+
+
+@router.get("/estado")
+def estado():
+    """Indica al frontend si el panel docente pide inicio de sesión."""
+    return {"abierto": panel_abierto()}
 
 
 class Credenciales(BaseModel):

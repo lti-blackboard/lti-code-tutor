@@ -69,8 +69,18 @@ function TextoAnalisis({ texto }) {
 }
 
 // Contenedor del panel: pide inicio de sesión y separa las dos pestañas.
-export default function PanelDocente({ token, onEntrar, onNoAutorizado }) {
+export default function PanelDocente({ token, cargandoAcceso, onEntrar, onNoAutorizado }) {
   const [pestana, setPestana] = useState('actividad') // 'actividad' | 'ejercicios'
+
+  if (cargandoAcceso) {
+    return (
+      <div className="dp-pagina ct-entrada">
+        <div className="dp-estado">
+          Conectando con el servidor… Si estuvo inactivo, puede tardar hasta un minuto.
+        </div>
+      </div>
+    )
+  }
 
   if (!token) {
     return (

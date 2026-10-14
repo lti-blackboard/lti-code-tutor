@@ -138,6 +138,19 @@ export async function loginDocente(usuario, clave) {
 
 // Llamada a una ruta protegida del panel. Si la sesión venció, borra el
 // token y lanza un error con codigo = 'NO_AUTORIZADO'.
+// Indica si el panel docente está abierto (sin usuario ni contraseña).
+// Si el servidor no responde, se asume que pide inicio de sesión.
+export async function obtenerPanelAbierto() {
+  try {
+    const respuesta = await fetch(`${API_BASE}/auth/estado`)
+    if (!respuesta.ok) return false
+    const datos = await respuesta.json()
+    return !!datos.abierto
+  } catch {
+    return false
+  }
+}
+
 export async function fetchDocente(ruta, opciones = {}) {
   const respuesta = await fetch(`${API_BASE}${ruta}`, {
     ...opciones,
