@@ -12,16 +12,20 @@ Herramienta educativa pensada para integrarse a Blackboard mediante el estándar
 
 Prototipo funcional desplegado en línea (Avance 1).
 
+- Aplicación web: https://lti-code-tutor-frontend.vercel.app
+- Documentación de la API: https://lti-code-tutor-backend.onrender.com/docs (plan gratuito: la primera consulta puede tardar hasta un minuto)
+
 **Funcionando:**
 
-- Catálogo de 14 ejercicios en 7 temas, cada uno en Python y Java (28 en total). Cada ejercicio trae un código base con un error intencional.
+- Catálogo base inicial de 14 ejercicios por lenguaje (Python y Java) en 7 temas. Cada ejercicio trae un código base con un error intencional o incompleto y una salida esperada.
+- Estado de cada ejercicio para el estudiante (sin empezar, en progreso o resuelto): queda resuelto cuando la salida del programa coincide con la salida esperada.
 - Editor con ejecución real de código mediante Judge0, con bloqueo de pegado.
 - Tutor de IA con lógica pedagógica: solo pistas en la primera consulta; desde la segunda, el estudiante puede pedir una explicación directa, que explica el error sin entregar el código corregido completo.
 - Protecciones del tutor: instrucciones blindadas contra manipulación, validación de entradas, límite de 15 consultas cada 10 minutos por sesión y recorte de errores largos (máximo 20 líneas).
-- Panel docente: consultas al tutor registradas, sesiones de estudiante, casos con 3 o más intentos en un mismo ejercicio, porcentaje que pidió explicación directa, mapa de dificultad por ejercicio, alertas e historial por sesión.
+- Panel docente, pestaña "Actividad del curso": consultas al tutor registradas, sesiones de estudiante, tasa de resolución, porcentaje que pidió explicación directa, mapa de dificultad por ejercicio, alertas por casos con 3 o más intentos en un mismo ejercicio e historial por sesión.
 - Base de datos permanente en PostgreSQL (Neon).
-- Acceso docente con usuario y contraseña (variables `DOCENTE_USUARIO` y `DOCENTE_CLAVE` en el servidor; nunca en el código).
-- El docente puede crear, editar y eliminar ejercicios propios (Python o Java, con tema y nivel), que aparecen en el catálogo con la etiqueta "Del docente".
+- Panel docente, pestaña "Ejercicios": el docente puede editar cualquier ejercicio (un ejercicio base editado queda como "Modificado" y se puede restaurar a su versión original), ocultarlo o mostrarlo a los estudiantes, y crear ejercicios propios en Python o Java, con tema, nivel y salida esperada. Solo los ejercicios creados por el docente se pueden eliminar; los del catálogo base se ocultan.
+- Acceso al panel docente: en la versión publicada para la evaluación del proyecto, el panel está abierto, sin usuario ni contraseña. El inicio de sesión está implementado y se activa en el servidor (ver "Ejecución local"). Con la integración LTI, el acceso del docente vendrá del rol que entrega Blackboard.
 - Sugerencias para el docente por reglas y análisis de las preguntas con IA.
 
 **Pendiente:**
@@ -62,9 +66,9 @@ Crear un archivo `.env` (nunca subirlo a GitHub) con al menos:
 ANTHROPIC_API_KEY=tu_clave
 ```
 
-Para el panel docente: `DOCENTE_USUARIO` y `DOCENTE_CLAVE` (sin ellas el panel queda cerrado).
+Panel docente: por defecto queda abierto, sin usuario ni contraseña. Para exigir inicio de sesión, definir `PANEL_DOCENTE_ABIERTO=false` junto con `DOCENTE_USUARIO` y `DOCENTE_CLAVE` (las credenciales van solo en el servidor, nunca en el código). Si se exige inicio de sesión y faltan las credenciales, el panel queda cerrado.
 
-Variables opcionales: `DATABASE_URL` (PostgreSQL; sin ella se usa SQLite local), `MODELO_IA`, `RATE_LIMIT_MAX_CONSULTAS`, `RATE_LIMIT_VENTANA_MINUTOS`, `MAX_CARACTERES_CODIGO`, `MAX_CARACTERES_PREGUNTA`, `LTI_CLIENT_ID`, `LTI_ISSUER`.
+Variables opcionales: `DATABASE_URL` (PostgreSQL; sin ella se usa SQLite local), `MODELO_IA`, `RATE_LIMIT_MAX_CONSULTAS`, `RATE_LIMIT_VENTANA_MINUTOS`, `MAX_CARACTERES_CODIGO`, `MAX_CARACTERES_PREGUNTA`, `DOCENTE_SECRETO` (firma de las sesiones del docente; sin ella se genera una al iniciar el servidor), `LTI_CLIENT_ID`, `LTI_ISSUER`.
 
 La documentación interactiva de la API queda en `http://127.0.0.1:8000/docs`.
 
